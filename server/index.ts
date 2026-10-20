@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -488,8 +489,23 @@ async function startServer() {
           server: httpServer,
         },
       },
-      appType: 'spa',
+      appType: 'custom',
     });
+
+    app.use((req, res, next) => {
+      if (req.path === '/' || req.path === '/index.html') {
+        const rawHtml = fs.readFileSync(path.resolve(process.cwd(), 'app.html'), 'utf-8');
+        vite
+          .transformIndexHtml(req.originalUrl, rawHtml)
+          .then((transformed) => {
+            res.status(200).set({ 'Content-Type': 'text/html' }).end(transformed);
+          })
+          .catch(next);
+        return;
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   }
 
