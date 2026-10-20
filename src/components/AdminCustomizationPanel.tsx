@@ -251,7 +251,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
       subtitle: '',
       category: '3D Web & Frontend',
       description: '',
-      imageUrl: '/images/project-3d-commerce.jpg',
+      imageUrl: './images/project-3d-commerce.jpg',
       tags: ['React', 'Three.js', 'Full-Stack'],
       metricLabel: 'Impact',
       metricValue: '+200% Growth',

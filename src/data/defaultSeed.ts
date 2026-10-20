@@ -164,7 +164,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       category: '3D Web & Frontend',
       description:
         'Engineered an interactive 60fps Three.js product configurator allowing enterprise buyers to inspect precision hardware in real time, toggle PBR materials, inspect exploded assemblies, and generate instant quotes.',
-      imageUrl: '/images/project-3d-commerce.jpg',
+      imageUrl: './images/project-3d-commerce.jpg',
       tags: ['React', 'Three.js', 'WebGL Shaders', 'Tailwind CSS', 'TypeScript'],
       metricLabel: 'Conversion Lift',
       metricValue: '+285%',
@@ -180,7 +180,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       category: 'AI Media & Branding',
       description:
         'Conceived, branded, and scaled @SoulSyllables with custom AI visual synthesis, automated caption & cinema-grade audio mastering workflows, high-CTR thumbnail systems, and cohesive cross-platform storytelling.',
-      imageUrl: '/images/project-soulsyllables.jpg',
+      imageUrl: './images/project-soulsyllables.jpg',
       tags: ['AI Video Synthesis', 'Neural Voiceover', 'Brand Strategy', '@SoulSyllables'],
       metricLabel: 'Audience Reach',
       metricValue: '1.4M+ Views',
@@ -196,7 +196,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       category: 'Full-Stack & Cloud',
       description:
         'Full-stack Node.js, Python, and SQLite/PostgreSQL cloud control plane featuring automated SSL provisioning, real-time server health telemetry, role-based access control, and sub-50ms API latency.',
-      imageUrl: '/images/project-fullstack-cloud.jpg',
+      imageUrl: './images/project-fullstack-cloud.jpg',
       tags: ['Node.js', 'Python', 'Cloud SSL', 'React', 'Real-Time Telemetry'],
       metricLabel: 'Platform Uptime',
       metricValue: '99.99%',
@@ -212,7 +212,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       category: 'Mobile & APK',
       description:
         'Designed and shipped a sleek dark-mode mobile application packaged with automated signed Android APK distribution, biometric login UX, instant ledger sync, and matching web companion portal.',
-      imageUrl: '/images/project-mobile-apk.jpg',
+      imageUrl: './images/project-mobile-apk.jpg',
       tags: ['Mobile UI/UX', 'Signed APK Build', 'REST API', 'Cloud Sync'],
       metricLabel: 'Active Installs',
       metricValue: '65K+ Downloads',

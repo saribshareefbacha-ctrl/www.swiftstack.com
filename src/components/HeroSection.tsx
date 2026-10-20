@@ -114,7 +114,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <div className="flex items-start gap-4">
                 <div className="relative shrink-0">
                   <img
-                    src="/images/scan-sample-sarib.jpg"
+                    src="./images/scan-sample-sarib.jpg"
                     alt={hero.founderName}
                     className="w-14 h-14 rounded-2xl object-cover border border-cyan-400/40 shadow-md"
                   />

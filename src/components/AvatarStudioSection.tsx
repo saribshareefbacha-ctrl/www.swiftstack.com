@@ -80,19 +80,19 @@ const SCAN_PRESET_PHOTOS = [
     id: 'sarib',
     name: 'Muhammad Sarib Randhawa',
     role: 'CEO Signature Look',
-    src: '/images/scan-sample-sarib.jpg',
+    src: './images/scan-sample-sarib.jpg',
   },
   {
     id: 'exec',
     name: 'Executive Architect',
     role: 'Glasses + Navy Blazer',
-    src: '/images/scan-sample-exec.jpg',
+    src: './images/scan-sample-exec.jpg',
   },
   {
     id: 'creative',
     name: 'Creative Director',
     role: 'Curly Crop + Cyber Hoodie',
-    src: '/images/scan-sample-creative.jpg',
+    src: './images/scan-sample-creative.jpg',
   },
 ];
 
@@ -120,7 +120,7 @@ export const AvatarStudioSection: React.FC<AvatarStudioSectionProps> = ({
 
   // AI Photo Scanner States
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [scanImageSrc, setScanImageSrc] = useState<string>('/images/scan-sample-sarib.jpg');
+  const [scanImageSrc, setScanImageSrc] = useState<string>('./images/scan-sample-sarib.jpg');
   const [isScanning, setIsScanning] = useState(false);
   const [scanStepIdx, setScanStepIdx] = useState(0);
   const [scanReport, setScanReport] = useState<ScanBiometricReport | null>(null);

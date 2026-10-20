@@ -124,7 +124,7 @@ export function initializeDatabase(): void {
     hashPassword('admin'),
     'Muhammad Sarib Randhawa',
     'SwiftStack (SS)',
-    '/images/scan-sample-sarib.jpg',
+    './images/scan-sample-sarib.jpg',
     'credentials',
     'owner',
     now

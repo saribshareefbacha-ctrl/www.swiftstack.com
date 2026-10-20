@@ -52,7 +52,7 @@ export const AvatarStageCanvas: React.FC<AvatarStageCanvasProps> = ({
       fallback={
         <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
           <img
-            src="/images/scan-sample-sarib.jpg"
+            src="./images/scan-sample-sarib.jpg"
             alt="Muhammad Sarib Randhawa"
             className="w-48 h-48 rounded-full object-cover border-2 border-cyan-400/50 shadow-2xl mb-4"
           />

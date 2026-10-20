@@ -155,7 +155,7 @@ async function startServer() {
       subtitle: String(req.body.subtitle || 'Custom Digital Solution'),
       category: String(req.body.category || '3D Web & Full-Stack'),
       description: String(req.body.description || ''),
-      imageUrl: String(req.body.imageUrl || '/images/project-3d-commerce.jpg'),
+      imageUrl: String(req.body.imageUrl || './images/project-3d-commerce.jpg'),
       tags: Array.isArray(req.body.tags) ? req.body.tags : ['React', 'Three.js'],
       metricLabel: String(req.body.metricLabel || 'Impact'),
       metricValue: String(req.body.metricValue || '100% Custom'),
@@ -473,7 +473,7 @@ async function startServer() {
   const httpServer = http.createServer(app);
   const isProd = process.env.NODE_ENV === 'production';
   if (isProd) {
-    const distPath = path.resolve(process.cwd(), 'dist');
+    const distPath = path.resolve(process.cwd(), 'docs');
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
