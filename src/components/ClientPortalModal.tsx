@@ -1,221 +1,222 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ArrowUpRight,
-  Briefcase,
   CheckCircle2,
   Clock,
+  FileText,
   FolderKanban,
-  Layers,
   Minus,
   Plus,
-  PlusCircle,
-  Save,
   Send,
-  ShoppingBag,
+  ShoppingCart,
+  Sparkles,
   Trash2,
   User as UserIcon,
   X,
 } from 'lucide-react';
-import { CartItem, InquiryItem, ProjectItem, ServiceItem, UserProfile } from '../types/cms';
+import { CartItem, InquiryItem, ServiceItem, ThemeCMS, UserProfile } from '../types/cms';
 import { api } from '../utils/api';
+import { GlassSpinner, pushToast } from './GlassUI';
 
 interface ClientPortalModalProps {
   isOpen: boolean;
-  initialTab?: 'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile';
-  onClose: () => void;
-  user: UserProfile;
-  cart: CartItem[];
-  onAddToCart: (service: ServiceItem) => void;
-  onUpdateCartQty: (serviceId: string, delta: number) => void;
-  onClearCart: () => void;
+  initialTab?: 'cart' | 'orders' | 'new' | 'profile';
+  user: UserProfile | null;
   services: ServiceItem[];
-  projects: ProjectItem[];
-  allOrders: InquiryItem[];
+  inquiries: InquiryItem[];
+  cart: CartItem[];
+  theme: ThemeCMS;
+  onClose: () => void;
+  onOpenAuth: (tab?: 'login' | 'register') => void;
+  onUpdateCartQty: (serviceId: string, delta: number) => void;
+  onRemoveCartItem: (serviceId: string) => void;
+  onClearCart: () => void;
+  onAddServiceToCart: (service: ServiceItem) => void;
   onUserUpdated: (user: UserProfile) => void;
-  primaryColor: string;
-  secondaryColor?: string;
 }
 
-const BUDGET_RANGES = [
-  '$1,500 – $3,000',
-  '$3,000 – $7,500',
-  '$7,500 – $15,000',
-  '$15,000+ Enterprise',
-];
-
-const TIMELINES = [
-  'Urgent (< 2 Weeks)',
-  '2 – 4 Weeks',
-  '1 – 2 Months',
-  'Flexible / Ongoing Partnership',
-];
+const STATUS_STYLES: Record<string, { label: string; classes: string }> = {
+  new: {
+    label: 'Submitted · Pending Review',
+    classes: 'bg-sky-500/15 text-sky-300 border-sky-500/35',
+  },
+  in_review: {
+    label: 'In Technical Review',
+    classes: 'bg-amber-500/15 text-amber-300 border-amber-500/35',
+  },
+  quoted: {
+    label: 'Official Quote Ready',
+    classes: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/35',
+  },
+  in_progress: {
+    label: 'Active Sprint In Progress',
+    classes: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/35',
+  },
+  completed: {
+    label: 'Delivered & Completed',
+    classes: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35',
+  },
+};
 
 export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   isOpen,
-  initialTab = 'orders',
-  onClose,
+  initialTab = 'cart',
   user,
-  cart,
-  onAddToCart,
-  onUpdateCartQty,
-  onClearCart,
   services,
-  projects,
-  allOrders,
+  inquiries,
+  cart,
+  theme,
+  onClose,
+  onOpenAuth,
+  onUpdateCartQty,
+  onRemoveCartItem,
+  onClearCart,
+  onAddServiceToCart,
   onUserUpdated,
-  primaryColor,
-  secondaryColor = '#4f46e5',
 }) => {
-  const [tab, setTab] = useState<
-    'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile'
-  >(initialTab);
+  const [tab, setTab] = useState<'cart' | 'orders' | 'new' | 'profile'>(initialTab);
+  const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [company, setCompany] = useState(user?.company || '');
+  const [profileSaved, setProfileSaved] = useState(false);
 
-  const [serviceTitle, setServiceTitle] = useState(
-    services[0]?.title || 'Full-Stack Web Development & Custom SaaS Apps'
-  );
-  const [budgetRange, setBudgetRange] = useState(BUDGET_RANGES[1]);
-  const [timeline, setTimeline] = useState(TIMELINES[1]);
+  const [checkoutName, setCheckoutName] = useState(user?.displayName || '');
+  const [checkoutEmail, setCheckoutEmail] = useState(user?.email || '');
+  const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [checkoutDone, setCheckoutDone] = useState(false);
+
+  const [serviceTitle, setServiceTitle] = useState(services[0]?.title || 'Custom Service');
+  const [budgetRange, setBudgetRange] = useState('$1,000 – $2,500 (Growth Build)');
+  const [timeline, setTimeline] = useState('2 – 4 Weeks');
   const [projectDetails, setProjectDetails] = useState('');
-  const [submittingOrder, setSubmittingOrder] = useState(false);
-  const [orderPlacedToast, setOrderPlacedToast] = useState(false);
-
-  const [displayName, setDisplayName] = useState(user.displayName);
-  const [company, setCompany] = useState(user.company);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileSavedToast, setProfileSavedToast] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setTab(initialTab);
+    setCheckoutDone(false);
   }, [initialTab, isOpen]);
 
-  const clientOrders = useMemo(() => {
-    const emailClean = (user.email || '').toLowerCase();
-    return allOrders.filter(
-      (item) =>
-        item.clientId === user.id ||
-        (emailClean && item.clientEmail.toLowerCase() === emailClean)
-    );
-  }, [allOrders, user.id, user.email]);
-
-  const cartSubtotal = useMemo(
-    () => cart.reduce((sum, c) => sum + c.basePriceUsd * c.quantity, 0),
-    [cart]
-  );
+  useEffect(() => {
+    if (user) {
+      setDisplayName(user.displayName);
+      setCompany(user.company);
+      setCheckoutName(user.displayName);
+      setCheckoutEmail(user.email);
+    }
+  }, [user]);
 
   if (!isOpen) return null;
 
-  const handleCheckoutCart = async (e: React.FormEvent) => {
+  const clientOrders = user
+    ? inquiries.filter(
+        (i) => i.clientId === user.id || i.clientEmail.toLowerCase() === user.email.toLowerCase()
+      )
+    : [];
+
+  const cartSubtotal = cart.reduce((sum, item) => sum + item.basePriceUsd * item.quantity, 0);
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const handleCartCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cart.length === 0) return;
-    setSubmittingOrder(true);
+    if (!cart.length) return;
+    setSubmitting(true);
     try {
+      const summaryTitles = cart.map((c) => `${c.title} (×${c.quantity})`).join(' + ');
       await api.submitInquiry({
-        clientId: user.id,
-        clientName: user.displayName,
-        clientEmail: user.email,
-        companyName: user.company || '',
-        serviceTitle: `Cart Checkout (${cart.map((c) => `${c.title} x${c.quantity}`).join(', ')})`,
-        budgetRange: `$${cartSubtotal.toLocaleString()} USD`,
-        timeline,
+        clientId: user?.id || null,
+        clientName: checkoutName || user?.displayName || 'SwiftStack Shopper',
+        clientEmail: checkoutEmail || user?.email || '',
+        companyName: user?.company || '',
+        serviceTitle: summaryTitles,
+        budgetRange: `Shopping Cart Order ($${cartSubtotal.toLocaleString()} USD)`,
+        timeline: 'Priority Kickoff',
         projectDetails:
-          projectDetails.trim() ||
-          `Portal Cart Checkout for ${cart.map((c) => `${c.title} (${c.quantity}x)`).join(', ')}.`,
+          checkoutNotes.trim() ||
+          `Direct Shopping Cart Order for ${totalItems} item(s): ${summaryTitles}.`,
         cartSummary: cart,
       });
       onClearCart();
-      setProjectDetails('');
-      setOrderPlacedToast(true);
-      setTimeout(() => {
-        setOrderPlacedToast(false);
-        setTab('orders');
-      }, 900);
+      setCheckoutNotes('');
+      setCheckoutDone(true);
+      pushToast(
+        'Shopping Cart Order Placed!',
+        `Order total $${cartSubtotal.toLocaleString()} USD sent to SwiftStack.`,
+        'success'
+      );
+      if (user) {
+        setTimeout(() => {
+          setCheckoutDone(false);
+          setTab('orders');
+        }, 1200);
+      }
     } finally {
-      setSubmittingOrder(false);
+      setSubmitting(false);
     }
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectDetails.trim()) return;
-    setSubmittingOrder(true);
+    if (!user) return;
+    setSubmitting(true);
+    try {
+      const res = await api.updateProfile(user, { displayName, company });
+      onUserUpdated(res.user);
+      setProfileSaved(true);
+      pushToast('Profile Saved', 'Your account profile details were updated.', 'success');
+      setTimeout(() => setProfileSaved(false), 2500);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleNewOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSubmitting(true);
     try {
       await api.submitInquiry({
         clientId: user.id,
         clientName: user.displayName,
         clientEmail: user.email,
-        companyName: user.company || '',
+        companyName: user.company,
         serviceTitle,
         budgetRange,
         timeline,
         projectDetails,
       });
       setProjectDetails('');
-      setOrderPlacedToast(true);
-      setTimeout(() => {
-        setOrderPlacedToast(false);
-        setTab('orders');
-      }, 1000);
+      pushToast('Brief Submitted', 'Your project brief is now live in your orders list.', 'success');
+      setTab('orders');
     } finally {
-      setSubmittingOrder(false);
-    }
-  };
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingProfile(true);
-    try {
-      const res = await api.updateProfile(user, { displayName, company });
-      onUserUpdated(res.user);
-      setProfileSavedToast(true);
-      setTimeout(() => setProfileSavedToast(false), 2500);
-    } finally {
-      setSavingProfile(false);
-    }
-  };
-
-  const statusColor = (status: InquiryItem['status']) => {
-    switch (status) {
-      case 'quoted':
-        return 'border-cyan-500/40 bg-cyan-500/15 text-cyan-400';
-      case 'in-progress':
-        return 'border-indigo-500/40 bg-indigo-500/15 text-indigo-400';
-      case 'completed':
-        return 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400';
-      case 'reviewing':
-        return 'border-amber-500/40 bg-amber-500/15 text-amber-500';
-      default:
-        return 'border-slate-400/35 bg-slate-500/10 text-slate-300';
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-md">
-      <div className="ss-modal-surface relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl shadow-2xl">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-400/25 px-6 py-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/60 backdrop-blur-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="SwiftStack Shopping Cart & Client Portal"
+    >
+      <div className="ss-modal-surface relative w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Top Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/15 bg-white/5 shrink-0">
           <div className="flex items-center gap-3">
-            {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.displayName}
-                className="h-10 w-10 rounded-full border border-cyan-500/40 object-cover"
-              />
-            ) : (
-              <div
-                className="keep-white-text flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold shadow"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                {user.displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div
+              className="keep-white-text w-10 h-10 rounded-2xl flex items-center justify-center font-display font-bold text-white"
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+              }}
+            >
+              {user ? user.displayName.charAt(0).toUpperCase() : <ShoppingCart className="w-5 h-5" />}
+            </div>
             <div>
-              <h3 className="font-display text-lg font-bold text-white">
-                {user.displayName} — SwiftStack Shopping &amp; Client Portal
-              </h3>
-              <p className="text-xs text-slate-400">
-                {user.email} {user.company ? `• ${user.company}` : ''}
+              <h2 className="font-display text-lg sm:text-xl font-bold text-white">
+                {user ? `${user.displayName}'s SwiftStack Portal` : 'SwiftStack Shopping Cart'}
+              </h2>
+              <p className="text-xs text-slate-300">
+                {user
+                  ? `${user.email}${user.company ? ` · ${user.company}` : ''}`
+                  : 'Add services to cart and check out seamlessly'}
               </p>
             </div>
           </div>
@@ -223,565 +224,522 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close Client Portal"
-            className="ss-glass-btn rounded-xl p-2"
+            aria-label="Close portal"
+            className="ss-glass-btn p-2 rounded-xl text-slate-300 hover:text-white"
           >
-            <X className="h-5 w-5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-400/25 px-6 py-3">
-          <button
-            type="button"
-            onClick={() => setTab('orders')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'orders' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
-            }`}
-            style={
-              tab === 'orders'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
-                : undefined
-            }
-          >
-            <Briefcase className="h-3.5 w-3.5" />
-            <span>My Orders ({clientOrders.length})</span>
-          </button>
-
+        <div className="flex items-center gap-2 px-6 py-3 border-b border-white/15 bg-white/[0.03] shrink-0 overflow-x-auto">
           <button
             type="button"
             onClick={() => setTab('cart')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'cart' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              tab === 'cart' ? 'keep-white-text text-white shadow' : 'text-slate-300 hover:text-white'
             }`}
             style={
               tab === 'cart'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                ? {
+                    backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                  }
                 : undefined
             }
           >
-            <ShoppingBag className="h-3.5 w-3.5" />
-            <span>Shopping Cart ({cart.reduce((s, c) => s + c.quantity, 0)})</span>
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>Shopping Cart ({totalItems})</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setTab('new-order')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'new-order' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
-            }`}
-            style={
-              tab === 'new-order'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
-                : undefined
-            }
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span>Custom Brief</span>
-          </button>
+          {user ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setTab('orders')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  tab === 'orders'
+                    ? 'keep-white-text text-white shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                style={
+                  tab === 'orders'
+                    ? {
+                        backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                      }
+                    : undefined
+                }
+              >
+                <FolderKanban className="w-3.5 h-3.5" />
+                <span>My Orders &amp; Quotes ({clientOrders.length})</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setTab('services')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'services' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
-            }`}
-            style={
-              tab === 'services'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
-                : undefined
-            }
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span>Services ({services.length})</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setTab('new')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  tab === 'new'
+                    ? 'keep-white-text text-white shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                style={
+                  tab === 'new'
+                    ? {
+                        backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                      }
+                    : undefined
+                }
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Custom Project Brief</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setTab('projects')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'projects' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
-            }`}
-            style={
-              tab === 'projects'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
-                : undefined
-            }
-          >
-            <FolderKanban className="h-3.5 w-3.5" />
-            <span>Projects ({projects.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTab('profile')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
-              tab === 'profile' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
-            }`}
-            style={
-              tab === 'profile'
-                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
-                : undefined
-            }
-          >
-            <UserIcon className="h-3.5 w-3.5" />
-            <span>Account</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setTab('profile')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                  tab === 'profile'
+                    ? 'keep-white-text text-white shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                style={
+                  tab === 'profile'
+                    ? {
+                        backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                      }
+                    : undefined
+                }
+              >
+                <UserIcon className="w-3.5 h-3.5" />
+                <span>Profile Settings</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenAuth('login');
+              }}
+              className="ml-auto inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-cyan-400 hover:underline"
+            >
+              <span>Sign in to view order history</span>
+            </button>
+          )}
         </div>
 
-        {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* CART CHECKOUT TAB */}
+        {/* Main Content Body */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-5">
           {tab === 'cart' && (
-            <div className="mx-auto max-w-2xl space-y-5">
-              {cart.length === 0 ? (
-                <div className="ss-glass-card rounded-2xl p-10 text-center space-y-4">
-                  <ShoppingBag className="mx-auto h-10 w-10 text-cyan-400" />
-                  <div>
-                    <h4 className="font-display text-lg font-bold text-white">
-                      Your Portal Cart is Empty
-                    </h4>
-                    <p className="mx-auto mt-1 max-w-md text-xs sm:text-sm text-slate-400">
-                      Browse SwiftStack service packages and click Add to Cart for instant checkout.
+            <div className="space-y-6">
+              {checkoutDone ? (
+                <div className="ss-glass-card rounded-2xl p-8 text-center space-y-4">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                  <h3 className="font-display text-2xl font-bold text-white">
+                    Order Confirmed &amp; Sent to SwiftStack!
+                  </h3>
+                  <p className="text-sm text-slate-300 max-w-md mx-auto">
+                    Your selected digital services have been queued for onboarding with founder
+                    Muhammad Sarib Randhawa.
+                  </p>
+                </div>
+              ) : cart.length === 0 ? (
+                <div className="space-y-5">
+                  <div className="ss-glass-card rounded-2xl p-8 text-center space-y-3">
+                    <ShoppingCart className="w-10 h-10 text-cyan-400 mx-auto" />
+                    <h3 className="font-display text-lg font-bold text-white">
+                      Your SwiftStack Cart is Empty
+                    </h3>
+                    <p className="text-sm text-slate-300 max-w-md mx-auto">
+                      Quick-add any digital package below or browse the full service catalog.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setTab('services')}
-                    className="keep-white-text ss-cta-btn rounded-xl px-5 py-2.5 text-xs font-bold shadow"
-                    style={{
-                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                    }}
-                  >
-                    Browse Services &amp; Add to Cart
-                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {services.slice(0, 4).map((srv) => (
+                      <div
+                        key={srv.id}
+                        className="ss-glass-card rounded-2xl p-4 flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-mono text-cyan-400">{srv.category}</div>
+                          <div className="text-sm font-bold text-white truncate">{srv.title}</div>
+                          <div className="text-xs text-slate-300 mt-0.5">{srv.priceLabel}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onAddServiceToCart(srv)}
+                          className="keep-white-text shrink-0 px-3 py-2 rounded-xl text-xs font-bold text-white"
+                          style={{
+                            backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                          }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <form onSubmit={handleCheckoutCart} className="space-y-4">
-                  <div className="space-y-2.5">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* Cart Items List */}
+                  <div className="lg:col-span-7 space-y-3">
                     {cart.map((item) => (
                       <div
                         key={item.serviceId}
-                        className="ss-glass-card flex items-center justify-between gap-4 rounded-2xl p-4"
+                        className="ss-glass-card rounded-2xl p-4 flex items-center justify-between gap-4"
                       >
-                        <div>
-                          <div className="font-display text-sm font-bold text-white">
+                        <div className="min-w-0">
+                          <span className="text-[11px] font-mono text-cyan-400">
+                            {item.category}
+                          </span>
+                          <h4 className="font-display text-sm sm:text-base font-bold text-white truncate">
                             {item.title}
-                          </div>
-                          <div className="text-xs font-mono text-cyan-400">
-                            ${(item.basePriceUsd * item.quantity).toLocaleString()} USD • Est.{' '}
-                            {item.turnaround}
+                          </h4>
+                          <div className="text-xs text-slate-300 mt-0.5">
+                            ${item.basePriceUsd.toLocaleString()} USD base · {item.priceLabel}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+
+                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
                             onClick={() => onUpdateCartQty(item.serviceId, -1)}
-                            className="ss-glass-btn rounded-lg p-1.5"
+                            aria-label="Decrease quantity"
+                            className="ss-glass-btn p-1.5 rounded-lg"
                           >
-                            <Minus className="h-3.5 w-3.5" />
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-6 text-center font-mono text-sm font-bold text-white">
+                          <span className="w-6 text-center text-xs font-bold text-white">
                             {item.quantity}
                           </span>
                           <button
                             type="button"
                             onClick={() => onUpdateCartQty(item.serviceId, 1)}
-                            className="ss-glass-btn rounded-lg p-1.5"
+                            aria-label="Increase quantity"
+                            className="ss-glass-btn p-1.5 rounded-lg"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveCartItem(item.serviceId)}
+                            aria-label="Remove item"
+                            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="ss-glass-card flex items-center justify-between rounded-2xl p-4">
-                    <span className="font-display text-base font-bold text-white">
-                      Estimated Total
-                    </span>
-                    <div className="flex items-center gap-3">
+                  {/* Checkout Summary Form */}
+                  <form
+                    onSubmit={handleCartCheckout}
+                    className="lg:col-span-5 ss-glass-card rounded-2xl p-5 space-y-4"
+                  >
+                    <div className="flex items-center justify-between border-b border-white/15 pb-3">
+                      <span className="text-xs font-mono uppercase text-slate-300">
+                        Estimated Order Total
+                      </span>
                       <span className="font-display text-xl font-extrabold text-cyan-400">
                         ${cartSubtotal.toLocaleString()} USD
                       </span>
-                      <button
-                        type="button"
-                        onClick={onClearCart}
-                        className="text-xs text-rose-400 hover:underline inline-flex items-center gap-1"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Clear</span>
-                      </button>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                      Optional Project Notes / Domain / Requirements
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={projectDetails}
-                      onChange={(e) => setProjectDetails(e.target.value)}
-                      placeholder="Add any specific notes, brand references, or preferred launch timeline..."
-                      className="ss-glass-input w-full rounded-xl p-3.5 text-sm"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-200 mb-1">
+                        Your Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={checkoutName}
+                        onChange={(e) => setCheckoutName(e.target.value)}
+                        placeholder="Your full name"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2.5 text-xs"
+                      />
+                    </div>
 
-                  <button
-                    type="submit"
-                    disabled={submittingOrder}
-                    className="keep-white-text ss-cta-btn inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold shadow-lg"
-                    style={{
-                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                    }}
-                  >
-                    <Send className="h-4 w-4" />
-                    <span>
-                      {submittingOrder
-                        ? 'Processing Order...'
-                        : `Confirm Order ($${cartSubtotal.toLocaleString()} USD)`}
-                    </span>
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-200 mb-1">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={checkoutEmail}
+                        onChange={(e) => setCheckoutEmail(e.target.value)}
+                        placeholder="you@company.com"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2.5 text-xs"
+                      />
+                    </div>
 
-          {/* ORDERS TAB */}
-          {tab === 'orders' && (
-            <div className="space-y-4">
-              {clientOrders.length === 0 ? (
-                <div className="ss-glass-card rounded-2xl p-10 text-center space-y-4">
-                  <Briefcase className="mx-auto h-10 w-10 text-cyan-400" />
-                  <div>
-                    <h4 className="font-display text-lg font-bold text-white">
-                      No Active Orders Yet
-                    </h4>
-                    <p className="mx-auto mt-1 max-w-md text-xs sm:text-sm text-slate-400">
-                      Add services to your cart or submit a custom brief to track live quotes from
-                      Muhammad Sarib Randhawa.
-                    </p>
-                  </div>
-                  <div className="flex justify-center gap-3 pt-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-200 mb-1">
+                        Project Kickoff Notes (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={checkoutNotes}
+                        onChange={(e) => setCheckoutNotes(e.target.value)}
+                        placeholder="Preferred domain, brand colors, or timeline notes..."
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-xs"
+                      />
+                    </div>
+
                     <button
-                      type="button"
-                      onClick={() => setTab('services')}
-                      className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold shadow"
+                      type="submit"
+                      disabled={submitting}
+                      className="keep-white-text ss-cta-btn w-full py-3 px-4 rounded-xl text-xs font-bold text-white shadow-lg inline-flex items-center justify-center gap-2"
                       style={{
-                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                        backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
                       }}
                     >
-                      <ShoppingBag className="h-4 w-4" />
-                      <span>Browse Services</span>
+                      {submitting ? (
+                        <>
+                          <GlassSpinner size="sm" />
+                          <span>Placing Order...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>Confirm Order &amp; Lock Quote</span>
+                        </>
+                      )}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setTab('new-order')}
-                      className="ss-glass-btn rounded-xl px-5 py-2.5 text-xs font-semibold"
-                    >
-                      Custom Brief
-                    </button>
-                  </div>
+                  </form>
                 </div>
-              ) : (
-                clientOrders.map((item) => (
-                  <div key={item.id} className="ss-glass-card rounded-2xl p-5 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="text-sm font-bold text-white">{item.serviceTitle}</span>
-                        <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
-                          <Clock className="h-3 w-3 text-cyan-400" />
-                          <span>Budget: {item.budgetRange}</span>
-                          <span>•</span>
-                          <span>Timeline: {item.timeline}</span>
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${statusColor(
-                          item.status
-                        )}`}
-                      >
-                        {item.status}
-                      </span>
-                    </div>
-
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      {item.projectDetails}
-                    </p>
-
-                    {(item.quotedAmount || item.adminResponse) && (
-                      <div className="ss-glass-card rounded-xl p-4 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-cyan-400">
-                            Executive Response — Muhammad Sarib Randhawa
-                          </span>
-                          {item.quotedAmount && (
-                            <span className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400">
-                              Quoted: {item.quotedAmount}
-                            </span>
-                          )}
-                        </div>
-                        {item.adminResponse && (
-                          <p className="text-xs text-slate-200 leading-relaxed">
-                            {item.adminResponse}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))
               )}
             </div>
           )}
 
-          {/* CUSTOM BRIEF TAB */}
-          {tab === 'new-order' && (
-            <form onSubmit={handlePlaceOrder} className="mx-auto max-w-2xl space-y-4">
-              {orderPlacedToast && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3.5 text-xs font-semibold text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>Order submitted to SwiftStack Cloud! Opening tracker...</span>
+          {tab === 'orders' && user && (
+            <>
+              {clientOrders.length === 0 ? (
+                <div className="ss-glass-card rounded-2xl p-10 text-center space-y-4">
+                  <FileText className="w-10 h-10 text-slate-400 mx-auto" />
+                  <h3 className="font-display text-lg font-bold text-white">
+                    No Project Orders Yet
+                  </h3>
+                  <p className="text-sm text-slate-300 max-w-md mx-auto">
+                    Submit a service order or cart checkout and track live status updates and
+                    official quotes right here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTab('new')}
+                    className="keep-white-text px-5 py-2.5 rounded-xl text-xs font-bold text-white"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                    }}
+                  >
+                    Create Your First Order Request
+                  </button>
                 </div>
-              )}
+              ) : (
+                clientOrders.map((order) => {
+                  const badge = STATUS_STYLES[order.status] || STATUS_STYLES.new;
+                  return (
+                    <div key={order.id} className="ss-glass-card rounded-2xl p-5 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-mono text-cyan-400">
+                            Order #{order.id.slice(0, 8)}
+                          </span>
+                          <h3 className="font-display text-lg font-bold text-white">
+                            {order.serviceTitle}
+                          </h3>
+                        </div>
+                        <span
+                          className={`text-xs font-semibold px-3 py-1 rounded-full border ${badge.classes}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
 
+                      <p className="text-sm text-slate-200 leading-relaxed">
+                        {order.projectDetails}
+                      </p>
+
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-300">
+                        <span>
+                          Budget: <strong className="text-white">{order.budgetRange}</strong>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                          Timeline: <strong className="text-white">{order.timeline}</strong>
+                        </span>
+                      </div>
+
+                      {(order.quotedAmount || order.adminResponse) && (
+                        <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/30 p-4 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-mono uppercase text-cyan-300">
+                            <span className="inline-flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4" />
+                              SwiftStack Official Response
+                            </span>
+                            {order.quotedAmount && (
+                              <span className="font-bold text-white text-sm">
+                                Quote: {order.quotedAmount}
+                              </span>
+                            )}
+                          </div>
+                          {order.adminResponse && (
+                            <p className="text-xs sm:text-sm text-slate-100 leading-relaxed">
+                              {order.adminResponse}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </>
+          )}
+
+          {tab === 'new' && user && (
+            <form onSubmit={handleNewOrder} className="space-y-4 max-w-xl">
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-300">
+                <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
                   Select SwiftStack Service
                 </label>
                 <select
                   value={serviceTitle}
                   onChange={(e) => setServiceTitle(e.target.value)}
-                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
+                  className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                 >
                   {services.map((s) => (
                     <option key={s.id} value={s.title}>
                       {s.title} ({s.priceLabel})
                     </option>
                   ))}
-                  <option value="Custom Multi-Discipline Package">
-                    Custom Multi-Discipline Package
-                  </option>
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                    Estimated Budget
+                  <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                    Budget Range
                   </label>
                   <select
                     value={budgetRange}
                     onChange={(e) => setBudgetRange(e.target.value)}
-                    className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
+                    className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                   >
-                    {BUDGET_RANGES.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
+                    <option>$300 – $1,000 (Starter Package)</option>
+                    <option>$1,000 – $2,500 (Growth Build)</option>
+                    <option>$2,500 – $5,000 (Full Platform / 3D)</option>
+                    <option>$5,000 – $10,000+ (Enterprise Custom)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                    Target Delivery Timeline
+                  <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                    Target Timeline
                   </label>
                   <select
                     value={timeline}
                     onChange={(e) => setTimeline(e.target.value)}
-                    className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
+                    className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                   >
-                    {TIMELINES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
+                    <option>Urgent (Within 1 Week)</option>
+                    <option>2 – 4 Weeks</option>
+                    <option>1 – 2 Months</option>
+                    <option>Ongoing Retainer Partnership</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                  Project Scope &amp; Requirements
+                <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                  Project Scope &amp; Deliverables *
                 </label>
                 <textarea
-                  rows={5}
                   required
+                  rows={4}
                   value={projectDetails}
                   onChange={(e) => setProjectDetails(e.target.value)}
-                  placeholder="Describe your product goals, required features, target launch date, or reference links..."
-                  className="ss-glass-input w-full rounded-xl p-4 text-sm"
+                  placeholder="Describe your goals, features, references, and target launch window..."
+                  className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={submittingOrder}
-                className="keep-white-text ss-cta-btn inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold shadow-lg"
+                disabled={submitting}
+                className="keep-white-text ss-cta-btn inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white shadow-lg"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
                 }}
               >
-                <Send className="h-4 w-4" />
-                <span>{submittingOrder ? 'Submitting Order...' : 'Submit Custom Brief'}</span>
+                {submitting ? (
+                  <>
+                    <GlassSpinner size="sm" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Submit Order Request</span>
+                  </>
+                )}
               </button>
             </form>
           )}
 
-          {/* BROWSE SERVICES TAB */}
-          {tab === 'services' && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {services.map((srv) => (
-                <div
-                  key={srv.id}
-                  className="ss-glass-card ss-glass-interactive flex flex-col justify-between rounded-2xl p-5"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
-                        {srv.category}
-                      </span>
-                      <span className="ss-glass-card rounded-lg px-2.5 py-1 text-xs font-bold text-white">
-                        {srv.priceLabel}
-                      </span>
-                    </div>
-                    <h4 className="mt-2 font-display text-base font-bold text-white">
-                      {srv.title}
-                    </h4>
-                    <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">
-                      {srv.shortDescription}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-400/25 pt-3">
-                    <span className="text-[11px] text-slate-400">Delivery: {srv.turnaround}</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddToCart(srv);
-                          setTab('cart');
-                        }}
-                        className="keep-white-text ss-cta-btn inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold"
-                        style={{
-                          backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                        }}
-                      >
-                        <ShoppingBag className="h-3 w-3" />
-                        <span>Add to Cart</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setServiceTitle(srv.title);
-                          setTab('new-order');
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:underline"
-                      >
-                        <span>Quote</span>
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* PROJECTS TAB */}
-          {tab === 'projects' && (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {projects.map((proj) => (
-                <div
-                  key={proj.id}
-                  className="ss-glass-card ss-glass-interactive overflow-hidden rounded-2xl"
-                >
-                  <div className="keep-dark-surface relative h-44 overflow-hidden">
-                    <img
-                      src={proj.imageUrl}
-                      alt={proj.title}
-                      className="h-full w-full object-cover"
-                    />
-                    <span
-                      className="keep-white-text absolute right-3 top-3 rounded-lg px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md"
-                      style={{ backgroundColor: 'rgba(6, 12, 26, 0.85)' }}
-                    >
-                      {proj.metricValue}
-                    </span>
-                  </div>
-                  <div className="p-4 space-y-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-400">
-                      {proj.category} • {proj.year}
-                    </div>
-                    <h4 className="font-display text-base font-bold text-white">{proj.title}</h4>
-                    <p className="text-xs text-slate-400 line-clamp-2">{proj.description}</p>
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProjectDetails(
-                            `Interested in an architecture similar to "${proj.title}" (${proj.subtitle}). Key goals: `
-                          );
-                          setTab('new-order');
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-cyan-400 hover:underline"
-                      >
-                        <span>Request Similar Project</span>
-                        <ArrowUpRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* PROFILE TAB */}
-          {tab === 'profile' && (
-            <form onSubmit={handleSaveProfile} className="max-w-md space-y-4">
-              {profileSavedToast && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3 text-xs text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Profile saved to SwiftStack Cloud.</span>
+          {tab === 'profile' && user && (
+            <form onSubmit={handleSaveProfile} className="space-y-4 max-w-lg">
+              {profileSaved && (
+                <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/35 px-4 py-2.5 text-xs text-emerald-300">
+                  Profile settings saved to Firebase successfully.
                 </div>
               )}
-
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                  Display Name
+                <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                  Full Name
                 </label>
                 <input
                   type="text"
                   required
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
+                  className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                 />
               </div>
-
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                  Company / Brand Name
+                <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                  Company / Organization
                 </label>
                 <input
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
+                  className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
                 />
               </div>
-
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-200 mb-1.5">
+                  Account Email
+                </label>
+                <input
+                  type="email"
+                  disabled
+                  value={user.email}
+                  className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm opacity-60 cursor-not-allowed"
+                />
+              </div>
               <button
                 type="submit"
-                disabled={savingProfile}
-                className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold shadow-lg"
+                disabled={submitting}
+                className="keep-white-text ss-cta-btn inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
                 }}
               >
-                <Save className="h-4 w-4" />
-                <span>{savingProfile ? 'Saving...' : 'Save Account Details'}</span>
+                {submitting && <GlassSpinner size="sm" />}
+                <span>Save Profile Changes</span>
               </button>
             </form>
           )}

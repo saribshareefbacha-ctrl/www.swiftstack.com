@@ -1,61 +1,65 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  ArrowRight,
-  Layers,
+  ArrowUpRight,
+  CheckCircle2,
+  Gauge,
   Pause,
   Play,
-  Settings2,
-  ShieldCheck,
+  RotateCcw,
+  Sliders,
   Sparkles,
   Volume2,
-  Zap,
 } from 'lucide-react';
-import { HeroCMS, VoiceEngineConfig, VoiceGender } from '../types/cms';
+import { HeroCMS, ThemeCMS, VoiceEngineConfig, VoiceGender } from '../types/cms';
 import {
   buildPakistaniSpeechMap,
   computeCalibratedVoiceParams,
+  computeCalibratedWordDelays,
   selectPakistaniEnglishVoice,
 } from '../utils/voiceEngine';
-import { triggerSignatureFingerTouch } from './FuturisticRobotCanvas';
 
 interface HeroSectionProps {
   hero: HeroCMS;
-  voiceConfig: VoiceEngineConfig;
-  primaryColor: string;
-  secondaryColor: string;
-  isOwner?: boolean;
-  onVoiceConfigChange: (next: VoiceEngineConfig) => void;
-  onExploreWork: () => void;
+  theme: ThemeCMS;
+  voice: VoiceEngineConfig;
+  onVoiceQuickChange: (patch: Partial<VoiceEngineConfig>) => void;
+  onExploreServices: () => void;
   onStartOrder: () => void;
-  onOpenVoiceCMS?: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   hero,
-  voiceConfig,
-  primaryColor,
-  secondaryColor,
-  isOwner = false,
-  onVoiceConfigChange,
-  onExploreWork,
+  theme,
+  voice,
+  onVoiceQuickChange,
+  onExploreServices,
   onStartOrder,
-  onOpenVoiceCMS,
 }) => {
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [activeWordIndex, setActiveWordIndex] = useState(-1);
-  const [showVoiceControls, setShowVoiceControls] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [activeVoiceLabel, setActiveVoiceLabel] = useState<string>('Pakistani English Calibrated');
 
-  const fallbackWordTimerRef = useRef<number | null>(null);
-  const boundaryReceivedRef = useRef(false);
+  const stepTimeoutRef = useRef<number | null>(null);
+  const currentWordRef = useRef<number>(-1);
+  const liveDelayMsRef = useRef<number>(voice.highlightDelayMs || 460);
+  const liveFreqRef = useRef<number>(voice.speechFrequency || 0.95);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Load Web Speech voices eagerly so Pakistani / South Asian voices are immediately ready
+  useEffect(() => {
+    liveDelayMsRef.current = voice.highlightDelayMs || 460;
+    liveFreqRef.current = voice.speechFrequency || 0.95;
+  }, [voice.highlightDelayMs, voice.speechFrequency]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const syncVoices = () => {
       const list = window.speechSynthesis.getVoices();
-      if (list.length > 0) setAvailableVoices(list);
+      if (list && list.length > 0) {
+        setAvailableVoices(list);
+      }
     };
     syncVoices();
     window.speechSynthesis.addEventListener('voiceschanged', syncVoices);
@@ -68,437 +72,503 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     () =>
       selectPakistaniEnglishVoice(
         availableVoices,
-        voiceConfig.voiceGender,
-        voiceConfig.preferredVoiceURI
+        voice.voiceGender,
+        voice.preferredVoiceURI
       ),
-    [availableVoices, voiceConfig.voiceGender, voiceConfig.preferredVoiceURI]
+    [availableVoices, voice.voiceGender, voice.preferredVoiceURI]
   );
+
+  useEffect(() => {
+    if (selectedVoiceInfo.voice) {
+      setActiveVoiceLabel(`${selectedVoiceInfo.voice.name} (${selectedVoiceInfo.voice.lang})`);
+    } else {
+      setActiveVoiceLabel(
+        `Pakistani English · ${voice.voiceGender === 'male' ? 'Male' : 'Female'} Synth`
+      );
+    }
+  }, [selectedVoiceInfo, voice.voiceGender]);
 
   const speechMap = useMemo(
     () =>
       buildPakistaniSpeechMap(
-        hero.voiceGreeting,
-        voiceConfig.pakistaniAccentPhonetics,
+        hero.introSpeechText || '',
+        voice.pakistaniAccentPhonetics,
         selectedVoiceInfo.isNativeSouthAsian
       ),
-    [
-      hero.voiceGreeting,
-      voiceConfig.pakistaniAccentPhonetics,
-      selectedVoiceInfo.isNativeSouthAsian,
-    ]
+    [hero.introSpeechText, voice.pakistaniAccentPhonetics, selectedVoiceInfo.isNativeSouthAsian]
   );
 
-  const stopSpeech = useCallback(() => {
-    if (fallbackWordTimerRef.current) {
-      window.clearInterval(fallbackWordTimerRef.current);
-      fallbackWordTimerRef.current = null;
+  const clearWordTimer = useCallback(() => {
+    if (stepTimeoutRef.current !== null) {
+      window.clearTimeout(stepTimeoutRef.current);
+      stepTimeoutRef.current = null;
     }
+  }, []);
+
+  const stopSpeechCompletely = useCallback(() => {
+    clearWordTimer();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    setIsSpeaking(false);
+    currentWordRef.current = -1;
+    setIsPlaying(false);
+    setIsPaused(false);
     setActiveWordIndex(-1);
-  }, []);
+  }, [clearWordTimer]);
 
   useEffect(() => {
     return () => {
-      stopSpeech();
+      stopSpeechCompletely();
     };
-  }, [stopSpeech]);
+  }, [stopSpeechCompletely]);
 
-  const startSpeakingWithConfig = useCallback(
-    (overrideConfig?: VoiceEngineConfig) => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-      const cfg = overrideConfig || voiceConfig;
-
-      stopSpeech();
-      triggerSignatureFingerTouch();
-
-      const voicesNow =
-        availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
-      const chosen = selectPakistaniEnglishVoice(
-        voicesNow,
-        cfg.voiceGender,
-        cfg.preferredVoiceURI
-      );
-      const map = buildPakistaniSpeechMap(
-        hero.voiceGreeting,
-        cfg.pakistaniAccentPhonetics,
-        chosen.isNativeSouthAsian
-      );
-
-      const utterance = new SpeechSynthesisUtterance(map.spokenText);
-      if (chosen.voice) {
-        utterance.voice = chosen.voice;
-        utterance.lang = chosen.voice.lang;
-      } else {
-        utterance.lang = 'en-PK';
+  const scheduleNextWordStep = useCallback(
+    (wordIndex: number) => {
+      clearWordTimer();
+      const total = speechMap.rawWords.length;
+      if (wordIndex >= total) {
+        return;
       }
 
-      const { rate, pitch } = computeCalibratedVoiceParams(cfg, chosen.matchedGender);
-      utterance.rate = rate;
-      utterance.pitch = pitch;
+      currentWordRef.current = wordIndex;
+      setActiveWordIndex(wordIndex);
 
-      boundaryReceivedRef.current = false;
-      setIsSpeaking(true);
-      setActiveWordIndex(0);
+      const perWordDelays = computeCalibratedWordDelays(
+        speechMap.rawWords,
+        liveDelayMsRef.current,
+        liveFreqRef.current
+      );
+      const waitMs = perWordDelays[wordIndex] ?? liveDelayMsRef.current;
 
-      utterance.onboundary = (event) => {
-        if (event.name === 'word' || typeof event.charIndex === 'number') {
-          boundaryReceivedRef.current = true;
-          const cIdx = event.charIndex;
-          const found = map.spans.find(
-            (sp) => cIdx >= sp.startChar && cIdx <= sp.endChar + 1
-          );
-          if (found) {
-            setActiveWordIndex(found.index);
-          }
+      stepTimeoutRef.current = window.setTimeout(() => {
+        if (currentWordRef.current + 1 < total) {
+          scheduleNextWordStep(currentWordRef.current + 1);
         }
-      };
-
-      const msPerWord = Math.max(195, Math.round(330 / rate));
-      fallbackWordTimerRef.current = window.setInterval(() => {
-        if (!boundaryReceivedRef.current) {
-          setActiveWordIndex((prev) =>
-            prev + 1 < map.rawWords.length ? prev + 1 : prev
-          );
-        }
-      }, msPerWord);
-
-      utterance.onend = () => stopSpeech();
-      utterance.onerror = () => stopSpeech();
-
-      window.speechSynthesis.speak(utterance);
+      }, waitMs);
     },
-    [availableVoices, hero.voiceGreeting, stopSpeech, voiceConfig]
+    [clearWordTimer, speechMap.rawWords]
   );
 
-  const handleTogglePlay = () => {
-    if (isSpeaking) {
-      stopSpeech();
+  const startIntroSpeech = useCallback(() => {
+    if (!speechMap.rawWords.length) return;
+    clearWordTimer();
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setIsPlaying(true);
+      setIsPaused(false);
+      scheduleNextWordStep(0);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(speechMap.spokenText);
+    utteranceRef.current = utterance;
+
+    const { rate, pitch } = computeCalibratedVoiceParams(
+      voice,
+      selectedVoiceInfo.matchedGender
+    );
+
+    if (selectedVoiceInfo.voice) {
+      utterance.voice = selectedVoiceInfo.voice;
+      utterance.lang = selectedVoiceInfo.voice.lang || 'en-PK';
     } else {
-      startSpeakingWithConfig();
+      utterance.lang = 'en-PK';
+    }
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = 1;
+
+    utterance.onstart = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+    };
+
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (event.name && event.name !== 'word') return;
+      const charIdx = event.charIndex ?? 0;
+      let matched = 0;
+      for (let i = 0; i < speechMap.spans.length; i++) {
+        if (charIdx >= speechMap.spans[i].startChar) {
+          matched = i;
+        } else {
+          break;
+        }
+      }
+      // Re-anchor smoothly ONLY if speech boundary is pacing behind our timer so highlight NEVER races ahead
+      if (matched < currentWordRef.current) {
+        scheduleNextWordStep(matched);
+      }
+    };
+
+    utterance.onend = () => {
+      clearWordTimer();
+      currentWordRef.current = -1;
+      setIsPlaying(false);
+      setIsPaused(false);
+      setActiveWordIndex(-1);
+    };
+
+    utterance.onerror = () => {
+      clearWordTimer();
+      currentWordRef.current = -1;
+      setIsPlaying(false);
+      setIsPaused(false);
+      setActiveWordIndex(-1);
+    };
+
+    setIsPlaying(true);
+    setIsPaused(false);
+    // Slight initial breath offset before word 0 lights up so audio utterance begins right in sync
+    stepTimeoutRef.current = window.setTimeout(() => {
+      scheduleNextWordStep(0);
+    }, 120);
+
+    window.speechSynthesis.speak(utterance);
+  }, [clearWordTimer, scheduleNextWordStep, selectedVoiceInfo, speechMap, voice]);
+
+  const handleTogglePlayPause = () => {
+    if (!isPlaying) {
+      startIntroSpeech();
+      return;
+    }
+
+    if (!isPaused) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.pause();
+      }
+      clearWordTimer();
+      setIsPaused(true);
+    } else {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.resume();
+      }
+      setIsPaused(false);
+      const resumeIdx = Math.max(0, currentWordRef.current);
+      scheduleNextWordStep(resumeIdx);
     }
   };
 
-  const handleSelectGender = (gender: VoiceGender) => {
-    const updated: VoiceEngineConfig = {
-      ...voiceConfig,
-      voiceGender: gender,
-      preferredVoiceURI: '',
-    };
-    onVoiceConfigChange(updated);
-    if (isSpeaking) {
-      startSpeakingWithConfig(updated);
+  const handleGenderSelect = (gender: VoiceGender) => {
+    onVoiceQuickChange({ voiceGender: gender });
+    if (isPlaying) {
+      stopSpeechCompletely();
     }
   };
 
-  const handleFrequencyChange = (freq: number) => {
-    const updated: VoiceEngineConfig = {
-      ...voiceConfig,
-      speechFrequency: freq,
-    };
-    onVoiceConfigChange(updated);
-    if (isSpeaking) {
-      startSpeakingWithConfig(updated);
-    }
-  };
-
-  const handlePitchChange = (pitchVal: number) => {
-    const updated: VoiceEngineConfig = {
-      ...voiceConfig,
-      voicePitch: pitchVal,
-    };
-    onVoiceConfigChange(updated);
-    if (isSpeaking) {
-      startSpeakingWithConfig(updated);
-    }
-  };
+  const wpmDisplay = Math.round(60000 / Math.max(180, voice.highlightDelayMs || 460));
 
   return (
     <section
       id="hero"
-      className="relative z-10 flex min-h-screen items-center pt-28 pb-16 px-4 sm:px-8 lg:px-14"
+      className="relative overflow-hidden pt-28 pb-16 sm:pt-32 sm:pb-24"
     >
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-center gap-10 lg:grid-cols-12">
-        {/* Left 6 Columns: Executive Headline, Pure Glass Bio & Equal-Height Floating Highlights */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="lg:col-span-6 space-y-6"
-        >
-          <div className="ss-glass-card inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold text-cyan-400">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-cyan-400" />
-            <span>{hero.badgeText}</span>
-          </div>
-
-          <h1 className="font-display text-4xl sm:text-5xl xl:text-[3.55rem] font-extrabold tracking-tight text-white leading-[1.08]">
-            {hero.headlinePrefix}{' '}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{
-                backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-              }}
-            >
-              {hero.headlineHighlight}
-            </span>
-          </h1>
-
-          <p className="max-w-2xl text-base sm:text-lg text-slate-300 leading-relaxed">
-            {hero.subheadline}
-          </p>
-
-          {/* Pure Ultra-Transparent Crystal Bio Card */}
-          <div className="ss-glass-card ss-glass-interactive rounded-2xl p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-              <span className="font-display text-sm font-bold text-white">
-                {hero.founderName}
-              </span>
-              <span className="text-[11px] font-mono font-semibold text-cyan-400">
-                {hero.founderTitle}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {hero.founderBio}
-            </p>
-          </div>
-
-          {/* Primary Actions */}
-          <div className="flex flex-wrap items-center gap-3.5 pt-1">
-            <button
-              type="button"
-              onClick={onStartOrder}
-              className="keep-white-text ss-cta-btn group inline-flex items-center gap-2.5 rounded-xl px-6 py-3.5 text-sm sm:text-base font-bold shadow-lg"
-              style={{
-                backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-              }}
-            >
-              <span>{hero.primaryCtaLabel}</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onExploreWork}
-              className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-5 py-3.5 text-sm sm:text-base font-semibold"
-            >
-              <span>{hero.secondaryCtaLabel}</span>
-            </button>
-          </div>
-
-          {/* Perfectly Aligned Equal-Height Floating Glass Stat Containers */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className="ss-glass-card ss-glass-interactive flex h-full flex-col justify-between rounded-2xl px-4 py-3.5">
-              <div className="flex items-center gap-1.5 text-cyan-400 text-xs font-bold">
-                <Zap className="h-3.5 w-3.5 shrink-0" />
-                <span>24h Rapid Quote</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Milestone roadmap &amp; cart checkout</p>
-            </div>
-
-            <div className="ss-glass-card ss-glass-interactive flex h-full flex-col justify-between rounded-2xl px-4 py-3.5">
-              <div className="flex items-center gap-1.5 text-indigo-400 text-xs font-bold">
-                <Layers className="h-3.5 w-3.5 shrink-0" />
-                <span>Full-Stack &amp; AI</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">SaaS, APKs, Cloud SSL &amp; Media</p>
-            </div>
-
-            <div className="ss-glass-card ss-glass-interactive flex h-full flex-col justify-between rounded-2xl px-4 py-3.5">
-              <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
-                <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                <span>Live Portal Sync</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">Real-time order &amp; status updates</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Right 6 Columns: Dynamic Text-Based Intro Stage & Pakistani English Voice Engine */}
-        <motion.div
-          initial={{ opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, delay: 0.08, ease: 'easeOut' }}
-          className="lg:col-span-6"
-        >
-          <div className="ss-glass-card rounded-3xl p-6 sm:p-8 space-y-6">
-            {/* Top Stage Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-cyan-400">
-                <Volume2 className="h-3.5 w-3.5 shrink-0" />
-                <span>{hero.voiceStageLabel || 'EXECUTIVE VOICE INTRODUCTION'}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowVoiceControls((prev) => !prev)}
-                  className="ss-glass-btn inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold"
-                >
-                  <Settings2 className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>Voice Settings</span>
-                </button>
-
-                {isOwner && onOpenVoiceCMS && (
-                  <button
-                    type="button"
-                    onClick={onOpenVoiceCMS}
-                    className="ss-glass-btn rounded-xl px-3 py-1.5 text-xs font-semibold text-cyan-400"
-                  >
-                    Edit Intro CMS
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Centerpiece Glowing Circular Play / Pause Button + Floating Harmonic Wave */}
-            <div className="relative flex flex-col items-center justify-center py-4">
-              {/* Outer pulsing digital energy halo */}
-              <motion.div
-                animate={
-                  isSpeaking
-                    ? { scale: [1, 1.32, 1], opacity: [0.45, 0.14, 0.45] }
-                    : { scale: [1, 1.12, 1], opacity: [0.22, 0.36, 0.22] }
-                }
-                transition={{
-                  duration: isSpeaking ? 1.8 : 3.2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-                className="pointer-events-none absolute h-28 w-28 rounded-full"
-                style={{
-                  background: `radial-gradient(circle, ${primaryColor}55 0%, ${secondaryColor}25 60%, transparent 75%)`,
-                }}
-              />
-
-              {/* Concentric Orbital Ring */}
-              <motion.div
-                animate={isSpeaking ? { rotate: 360 } : { rotate: 0 }}
-                transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
-                className="pointer-events-none absolute h-24 w-24 rounded-full border border-dashed border-cyan-400/45"
-              />
-
-              {/* Sleek Glowing Circular Play Button */}
-              <button
-                type="button"
-                onClick={handleTogglePlay}
-                aria-label={
-                  isSpeaking ? 'Pause Executive Audio Introduction' : 'Play Executive Audio Introduction'
-                }
-                className="keep-white-text relative z-10 flex h-20 w-20 items-center justify-center rounded-full shadow-[0_0_38px_rgba(6,182,212,0.5)] transition-transform duration-300 hover:scale-105 focus:outline-none"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                {isSpeaking ? (
-                  <Pause className="h-8 w-8 fill-white text-white" />
-                ) : (
-                  <Play className="ml-1 h-8 w-8 fill-white text-white" />
-                )}
-              </button>
-
-              {/* Status & Acoustic Wave Indicator */}
-              <div className="mt-4 flex items-center gap-2.5">
-                <span className="text-xs font-semibold text-slate-300">
-                  {isSpeaking
-                    ? `Speaking (${voiceConfig.voiceGender === 'female' ? 'Female' : 'Male'} · ${voiceConfig.speechFrequency.toFixed(2)}x)`
-                    : 'Click to Play Executive Introduction'}
-                </span>
-                {isSpeaking && (
-                  <span className="flex items-end gap-1 h-3.5" aria-hidden="true">
-                    {[0, 1, 2, 3, 4].map((bar) => (
-                      <motion.span
-                        key={bar}
-                        animate={{ height: ['30%', '100%', '40%'] }}
-                        transition={{
-                          duration: 0.55 + bar * 0.1,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        }}
-                        className="w-1 rounded-full bg-cyan-400"
-                      />
-                    ))}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Dynamic Floating Intro Text Stage with Real-Time Word-by-Word Cyan/Blue Highlighting */}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="ss-responsive-grid grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* Left Column: Agency Headline, Value Props & Direct CTAs */}
+          <div className="ss-hero-col space-y-6 lg:col-span-6">
             <motion.div
-              animate={
-                isSpeaking
-                  ? { y: [0, -5, 0] }
-                  : { y: 0 }
-              }
-              transition={{
-                duration: 3.4,
-                repeat: isSpeaking ? Infinity : 0,
-                ease: 'easeInOut',
-              }}
-              className="ss-glass-card rounded-2xl p-5 sm:p-6"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="ss-glass-card inline-flex items-center gap-2.5 rounded-full px-4 py-1.5"
             >
-              <p className="text-sm sm:text-base leading-[1.9] tracking-[-0.005em] text-slate-200 select-text">
-                {speechMap.rawWords.map((word, idx) => {
-                  const isCurrent = isSpeaking && idx === activeWordIndex;
-                  const isSpokenPast =
-                    isSpeaking && activeWordIndex > idx && activeWordIndex >= 0;
-                  return (
-                    <React.Fragment key={`${word}-${idx}`}>
-                      <span
-                        className={`inline-block rounded-md px-1 py-0.5 transition-all duration-150 ${
-                          isCurrent
-                            ? 'ss-word-highlight -translate-y-0.5 scale-[1.05] font-semibold'
-                            : isSpokenPast
-                              ? 'text-white opacity-95'
-                              : 'text-slate-300'
-                        }`}
-                      >
-                        {word}
-                      </span>{' '}
-                    </React.Fragment>
-                  );
-                })}
-              </p>
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-700/30 pt-3 text-[11px] font-mono text-slate-400">
-                <span>{hero.founderName} — {hero.companyName} ({hero.companyAbbreviation})</span>
-                <span className="text-cyan-400">
-                  Pakistani English Phonetics Active
-                </span>
-              </div>
+              <span className="relative flex h-2.5 w-2.5">
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                  style={{ backgroundColor: theme.primaryColor }}
+                />
+                <span
+                  className="relative inline-flex h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: theme.primaryColor }}
+                />
+              </span>
+              <span className="font-mono text-xs font-semibold tracking-wide text-cyan-300">
+                {hero.badgeText}
+              </span>
             </motion.div>
 
-            {/* Collapsible Live Voice Customization Panel (Male/Female, Frequency, Pitch) */}
-            {showVoiceControls && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="ss-glass-card rounded-2xl p-4 sm:p-5 space-y-4"
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.06 }}
+              className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl xl:text-[3.35rem] xl:leading-[1.1]"
+            >
+              <span>{hero.headlinePrefix} </span>
+              <span
+                className="bg-clip-text text-transparent"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor}, ${theme.accentColor})`,
+                }}
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-white">
-                    Studio Voice Customization
-                  </span>
+                {hero.headlineGradient}
+              </span>
+              <span> {hero.headlineSuffix}</span>
+            </motion.h1>
 
-                  {/* Male / Female Selector */}
-                  <div className="inline-flex rounded-xl border border-slate-400/30 p-0.5">
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.12 }}
+              className="max-w-xl text-base leading-relaxed text-slate-200 sm:text-lg"
+            >
+              {hero.subheadline}
+            </motion.p>
+
+            {/* Primary & Secondary Action Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.18 }}
+              className="flex flex-wrap items-center gap-3.5 pt-1"
+            >
+              <button
+                type="button"
+                onClick={onStartOrder}
+                className="keep-white-text ss-cta-btn group inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-sm font-bold text-white shadow-xl"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                }}
+              >
+                <span>{hero.primaryCtaLabel}</span>
+                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={onExploreServices}
+                className="ss-glass-btn inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-white"
+              >
+                <span>{hero.secondaryCtaLabel}</span>
+              </button>
+            </motion.div>
+
+            {/* Pure Sheesha Glass Metric Cards */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.24 }}
+              className="grid grid-cols-3 gap-3 pt-2"
+            >
+              {[
+                { value: hero.stat1Value, label: hero.stat1Label },
+                { value: hero.stat2Value, label: hero.stat2Label },
+                { value: hero.stat3Value, label: hero.stat3Label },
+              ].map((stat, idx) => (
+                <div
+                  key={idx}
+                  className="ss-glass-card ss-glass-interactive rounded-2xl p-3.5 sm:p-4"
+                >
+                  <div
+                    className="font-display text-lg font-extrabold sm:text-2xl"
+                    style={{ color: theme.primaryColor }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-medium text-slate-300 sm:text-xs">
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+
+          {/* Right Column: Pure Transparent Sheesha Interactive Voice & Floating Text Studio (ZERO CHARACTERS) */}
+          <div className="ss-hero-col lg:col-span-6">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="ss-glass-card relative rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6"
+            >
+              {/* Studio Status Top Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/15 pb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-cyan-400" />
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan-300">
+                    SwiftStack Dynamic Voice Studio
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300">
+                  <Volume2
+                    className={`h-3.5 w-3.5 ${
+                      isPlaying && !isPaused ? 'text-cyan-400 animate-pulse' : 'text-slate-400'
+                    }`}
+                  />
+                  <span>
+                    {isPlaying
+                      ? isPaused
+                        ? 'PAUSED'
+                        : 'SPEAKING LIVE'
+                      : `${wpmDisplay} WPM (${voice.highlightDelayMs}ms)`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Centered Glowing Circular Play Button + Ambient Acoustic Pulse Rings */}
+              <div className="relative flex flex-col items-center justify-center py-3">
+                <div className="relative flex items-center justify-center">
+                  {/* Outer Glowing Pulse Aura when Playing */}
+                  {isPlaying && !isPaused && (
+                    <>
+                      <motion.span
+                        animate={{ scale: [1, 1.55, 1.85], opacity: [0.55, 0.2, 0] }}
+                        transition={{ duration: 2.1, repeat: Infinity, ease: 'easeOut' }}
+                        className="pointer-events-none absolute h-20 w-20 rounded-full"
+                        style={{
+                          border: `1.5px solid ${theme.primaryColor}`,
+                          boxShadow: `0 0 28px ${theme.primaryColor}`,
+                        }}
+                      />
+                      <motion.span
+                        animate={{ scale: [1, 1.35, 1.6], opacity: [0.45, 0.15, 0] }}
+                        transition={{
+                          duration: 2.1,
+                          delay: 0.7,
+                          repeat: Infinity,
+                          ease: 'easeOut',
+                        }}
+                        className="pointer-events-none absolute h-20 w-20 rounded-full"
+                        style={{
+                          border: `1.5px solid ${theme.secondaryColor}`,
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {/* Centered Glowing Circular Play / Pause Button */}
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.07 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleTogglePlayPause}
+                    aria-label={
+                      isPlaying && !isPaused
+                        ? 'Pause SwiftStack Voice Intro'
+                        : 'Play SwiftStack Voice Intro'
+                    }
+                    className="keep-white-text relative z-10 flex h-20 w-20 items-center justify-center rounded-full shadow-2xl transition-shadow"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                      boxShadow:
+                        isPlaying && !isPaused
+                          ? `0 0 42px ${theme.primaryColor}aa, inset 0 1.5px 2px rgba(255,255,255,0.65)`
+                          : `0 14px 34px rgba(6, 182, 212, 0.45), inset 0 1.5px 2px rgba(255,255,255,0.6)`,
+                    }}
+                  >
+                    {isPlaying && !isPaused ? (
+                      <Pause className="h-8 w-8 text-white" />
+                    ) : (
+                      <Play className="h-8 w-8 translate-x-0.5 text-white" />
+                    )}
+                  </motion.button>
+
+                  {isPlaying && (
+                    <button
+                      type="button"
+                      onClick={stopSpeechCompletely}
+                      title="Reset Intro Playback"
+                      className="ss-glass-btn absolute -right-14 flex h-10 w-10 items-center justify-center rounded-full text-slate-200"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Live Acoustic Equalizer Pill */}
+                <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-cyan-300">
+                  {isPlaying && !isPaused ? (
+                    <div className="flex items-end gap-1 h-4">
+                      {[0.45, 0.95, 0.65, 1, 0.55, 0.85, 0.4].map((h, i) => (
+                        <motion.span
+                          key={i}
+                          animate={{ scaleY: [0.3, h, 0.35] }}
+                          transition={{
+                            duration: 0.65,
+                            repeat: Infinity,
+                            delay: i * 0.08,
+                            ease: 'easeInOut',
+                          }}
+                          className="w-1 h-3.5 origin-bottom rounded-full bg-cyan-400"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <span>Tap to Listen — Calibrated Real-Time Word Sync</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Floating Kinetic Intro Script Box with Real-Time Cyan/Blue Word Highlighting */}
+              <motion.div
+                animate={
+                  isPlaying && !isPaused
+                    ? { y: [0, -5, 0] }
+                    : { y: 0 }
+                }
+                transition={{
+                  duration: 3.4,
+                  repeat: isPlaying && !isPaused ? Infinity : 0,
+                  ease: 'easeInOut',
+                }}
+                className="ss-glass-card rounded-2xl p-5 sm:p-6"
+              >
+                <p className="text-center font-display text-base sm:text-lg leading-relaxed font-medium text-slate-100">
+                  {speechMap.rawWords.map((word, idx) => {
+                    const isActive = idx === activeWordIndex;
+                    const isSpoken = activeWordIndex > idx;
+                    return (
+                      <React.Fragment key={`${word}-${idx}`}>
+                        <motion.span
+                          animate={
+                            isActive
+                              ? { y: -2.5, scale: 1.07 }
+                              : { y: 0, scale: 1 }
+                          }
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          className={`inline-block px-1.5 py-0.5 transition-colors duration-200 ${
+                            isActive
+                              ? 'ss-word-highlight font-bold text-cyan-200'
+                              : isSpoken
+                                ? 'text-white'
+                                : 'text-slate-200'
+                          }`}
+                        >
+                          {word}
+                        </motion.span>{' '}
+                      </React.Fragment>
+                    );
+                  })}
+                </p>
+              </motion.div>
+
+              {/* Pakistani English Accent & Voice Customization Controls */}
+              <div className="ss-glass-card rounded-2xl p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                    <Sliders className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Voice Engine Controls</span>
+                  </div>
+
+                  {/* Male / Female Voice Selector */}
+                  <div className="inline-flex rounded-xl border border-white/20 bg-white/5 p-0.5">
                     {(['male', 'female'] as VoiceGender[]).map((g) => {
-                      const active = voiceConfig.voiceGender === g;
+                      const selected = voice.voiceGender === g;
                       return (
                         <button
                           key={g}
                           type="button"
-                          onClick={() => handleSelectGender(g)}
-                          className={`rounded-lg px-3.5 py-1 text-xs font-semibold capitalize transition ${
-                            active
-                              ? 'keep-white-text shadow-sm'
-                              : 'text-slate-400 hover:text-white'
+                          onClick={() => handleGenderSelect(g)}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold capitalize transition ${
+                            selected
+                              ? 'keep-white-text text-white shadow'
+                              : 'text-slate-300 hover:text-white'
                           }`}
                           style={
-                            active
+                            selected
                               ? {
-                                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
                                 }
                               : undefined
                           }
@@ -510,47 +580,65 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Pitch & Speech Frequency Sliders */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                      <span>Speech Frequency (Cadence)</span>
-                      <span className="font-mono font-semibold text-cyan-400">
-                        {voiceConfig.speechFrequency.toFixed(2)}x
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1">
+                      <span>Pitch</span>
+                      <span className="font-bold text-cyan-300">
+                        {voice.voicePitch.toFixed(2)}x
                       </span>
                     </div>
                     <input
                       type="range"
                       min="0.65"
-                      max="1.40"
+                      max="1.45"
                       step="0.05"
-                      value={voiceConfig.speechFrequency}
-                      onChange={(e) => handleFrequencyChange(parseFloat(e.target.value))}
-                      className="w-full accent-cyan-500 cursor-pointer"
+                      value={voice.voicePitch}
+                      onChange={(e) =>
+                        onVoiceQuickChange({ voicePitch: parseFloat(e.target.value) })
+                      }
+                      aria-label="Voice Pitch"
+                      className="h-1.5 w-full cursor-pointer accent-cyan-400"
                     />
                   </div>
 
                   <div>
-                    <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
-                      <span>Voice Pitch Fine-Tune</span>
-                      <span className="font-mono font-semibold text-cyan-400">
-                        {voiceConfig.voicePitch.toFixed(2)}
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1">
+                      <span>Frequency / Rate</span>
+                      <span className="font-bold text-cyan-300">
+                        {voice.speechFrequency.toFixed(2)}x
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="0.65"
-                      max="1.35"
-                      step="0.02"
-                      value={voiceConfig.voicePitch}
-                      onChange={(e) => handlePitchChange(parseFloat(e.target.value))}
-                      className="w-full accent-cyan-500 cursor-pointer"
+                      min="0.70"
+                      max="1.30"
+                      step="0.05"
+                      value={voice.speechFrequency}
+                      onChange={(e) =>
+                        onVoiceQuickChange({ speechFrequency: parseFloat(e.target.value) })
+                      }
+                      aria-label="Speech Frequency"
+                      className="h-1.5 w-full cursor-pointer accent-cyan-400"
                     />
                   </div>
                 </div>
-              </motion.div>
-            )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-300 border-t border-white/10">
+                  <span className="inline-flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    Pakistani English Phonetics (&ldquo;Randhawa&rdquo; soft &lsquo;dh&rsquo;)
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-mono text-cyan-300 truncate max-w-[230px]">
+                    <Gauge className="h-3 w-3 shrink-0" />
+                    {activeVoiceLabel}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

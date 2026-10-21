@@ -41,18 +41,26 @@ import {
   VoiceEngineConfig,
 } from '../types/cms';
 
-const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v4';
-const SESSION_ONLY_KEY = 'swiftstack_session_temp_v4';
-const RECENT_GOOGLE_ACCOUNTS_KEY = 'swiftstack_google_accounts_v4';
-const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v4';
-const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v4';
-const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v4';
-const LOCAL_CART_KEY = 'swiftstack_shopping_cart_v4';
-export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v4';
+const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v5';
+const SESSION_ONLY_KEY = 'swiftstack_session_temp_v5';
+const RECENT_GOOGLE_ACCOUNTS_KEY = 'swiftstack_google_accounts_v5';
+const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v5';
+const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v5';
+const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v5';
+const LOCAL_CART_KEY = 'swiftstack_shopping_cart_v5';
+export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v5';
 
-const OWNER_GOOGLE_EMAILS = ['sarib@swiftstack.com', 'saribshareefbacha@gmail.com'];
+/**
+ * Automatic Master Owner Recognition via Gmail & Official Studio Emails
+ * Matching ANY of these automatically grants Master Owner privileges & unlocks the Owner Dashboard.
+ */
+export const OWNER_GOOGLE_EMAILS = [
+  'saribshareefbacha@gmail.com',
+  'swiftstackdigi01@gmail.com',
+  'sarib@swiftstack.com',
+];
 
-const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site_v4');
+const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site_v5');
 const ORDERS_COL = collection(firestoreDb, 'swiftstack_orders');
 const USERS_COL = collection(firestoreDb, 'swiftstack_users');
 
@@ -81,7 +89,6 @@ export function syncFirebasePersistenceMode(rememberMe: boolean) {
   ).catch(() => {});
 }
 
-// Configure default local persistence upfront so signInWithPopup stays synchronous on click gestures
 if (typeof window !== 'undefined') {
   syncFirebasePersistenceMode(true);
 }
@@ -89,7 +96,7 @@ if (typeof window !== 'undefined') {
 export function getSavedThemeMode(): ThemeMode | null {
   try {
     const val = localStorage.getItem(THEME_STORAGE_KEY);
-    if (val === 'glass' || val === 'dark' || val === 'cyber') {
+    if (val === 'glass' || val === 'light' || val === 'dark' || val === 'cyber') {
       return val;
     }
   } catch {
@@ -146,7 +153,7 @@ function rememberGoogleAccountChoice(profile: UserProfile) {
   try {
     const raw = localStorage.getItem(RECENT_GOOGLE_ACCOUNTS_KEY);
     const prev: UserProfile[] = raw ? JSON.parse(raw) : [];
-    const next = [profile, ...prev.filter((p) => p.email !== profile.email)].slice(0, 5);
+    const next = [profile, ...prev.filter((p) => p.email !== profile.email)].slice(0, 6);
     localStorage.setItem(RECENT_GOOGLE_ACCOUNTS_KEY, JSON.stringify(next));
   } catch {
     // ignore
@@ -163,22 +170,22 @@ export interface QuickGoogleAccountOption {
 export function getAvailableGoogleChooserAccounts(): QuickGoogleAccountOption[] {
   const defaults: QuickGoogleAccountOption[] = [
     {
-      email: 'client.portal@gmail.com',
-      displayName: 'SwiftStack Google Client',
-      company: 'Verified Google Account',
-      badge: 'Personal / Client Account',
+      email: 'saribshareefbacha@gmail.com',
+      displayName: 'Muhammad Sarib Randhawa',
+      company: 'SwiftStack (SS)',
+      badge: 'Master Owner · Auto-Admin Access',
+    },
+    {
+      email: 'swiftstackdigi01@gmail.com',
+      displayName: 'SwiftStack Official (Owner)',
+      company: 'SwiftStack (SS)',
+      badge: 'Master Owner · Auto-Admin Access',
     },
     {
       email: 'zainab@lumina-tech.io',
       displayName: 'Zainab Malik',
       company: 'Lumina Tech Labs',
-      badge: 'Google Workspace · Active Order',
-    },
-    {
-      email: 'saribshareefbacha@gmail.com',
-      displayName: 'Muhammad Sarib Randhawa',
-      company: 'SwiftStack (SS)',
-      badge: 'Founder & Owner Google Account',
+      badge: 'Client Account · Shopping Portal',
     },
   ];
 
@@ -189,12 +196,16 @@ export function getAvailableGoogleChooserAccounts(): QuickGoogleAccountOption[] 
         email: u.email,
         displayName: u.displayName,
         company: u.company || 'Google Account',
-        badge: u.role === 'owner' ? 'Founder & Owner Google Account' : 'Saved on this device',
+        badge:
+          u.role === 'owner'
+            ? 'Master Owner · Auto-Admin Access'
+            : 'Saved Google Session',
       }));
       const seen = new Set<string>();
       return [...saved, ...defaults].filter((item) => {
-        if (seen.has(item.email)) return false;
-        seen.add(item.email);
+        const key = item.email.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
       });
     }
@@ -229,12 +240,21 @@ export function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
   return {
     branding: { ...base.branding, ...(raw.branding || {}) },
     hero: { ...base.hero, ...(raw.hero || {}) },
-    voice: { ...base.voice, ...(raw.voice || {}) },
+    voice: {
+      ...base.voice,
+      ...(raw.voice || {}),
+      highlightDelayMs:
+        typeof raw.voice?.highlightDelayMs === 'number' && !Number.isNaN(raw.voice.highlightDelayMs)
+          ? raw.voice.highlightDelayMs
+          : base.voice.highlightDelayMs,
+    },
     theme: {
       ...base.theme,
       ...(raw.theme || {}),
       defaultMode:
-        raw.theme?.defaultMode === 'dark' || raw.theme?.defaultMode === 'cyber'
+        raw.theme?.defaultMode === 'light' ||
+        raw.theme?.defaultMode === 'dark' ||
+        raw.theme?.defaultMode === 'cyber'
           ? raw.theme.defaultMode
           : 'glass',
     },
@@ -455,10 +475,12 @@ export const api = {
     return unsubscribe;
   },
 
-  subscribeAuth: (onUser: (user: UserProfile | null) => void): (() => void) => {
+  subscribeAuth: (
+    onUser: (user: UserProfile | null, fromOAuthRedirect?: boolean) => void
+  ): (() => void) => {
     const saved = getStoredUserSession();
     if (saved) {
-      onUser(saved);
+      onUser(saved, false);
     }
 
     getRedirectResult(firebaseAuth)
@@ -470,7 +492,7 @@ export const api = {
           setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
             () => {}
           );
-          onUser(profile);
+          onUser(profile, true);
         }
       })
       .catch(() => {});
@@ -478,18 +500,18 @@ export const api = {
     const unsub = onAuthStateChanged(firebaseAuth, (fbUser) => {
       const existing = getStoredUserSession();
       if (existing && (existing.role === 'owner' || existing.role === 'subadmin')) {
-        onUser(existing);
+        onUser(existing, false);
         return;
       }
       if (fbUser) {
         const profile = mapFirebaseUserWithRoles(fbUser);
         saveUserSession(profile, true);
         rememberGoogleAccountChoice(profile);
-        onUser(profile);
+        onUser(profile, false);
       } else if (existing) {
-        onUser(existing);
+        onUser(existing, false);
       } else {
-        onUser(null);
+        onUser(null, false);
       }
     });
 
@@ -526,7 +548,7 @@ export const api = {
     return fresh;
   },
 
-  // Sub-Admin Authorization & Management (Master Owner Only)
+  // Sub-Admin Authorization & Management
   createSubAdmin: async (payload: {
     displayName: string;
     username: string;
@@ -592,7 +614,7 @@ export const api = {
       basePriceUsd: parsedPrice,
       turnaround: service.turnaround || '1 – 2 Weeks',
       iconName: service.iconName || 'Sparkles',
-      accentHex: service.accentHex || '#0284c7',
+      accentHex: service.accentHex || '#22d3ee',
       featured: Boolean(service.featured),
     };
     cms.services = [...cms.services, created];
@@ -688,7 +710,7 @@ export const api = {
       const ownerProfile: UserProfile = {
         id: 'owner-sarib-randhawa',
         username: 'admin',
-        email: 'sarib@swiftstack.com',
+        email: 'saribshareefbacha@gmail.com',
         displayName: 'Muhammad Sarib Randhawa',
         company: 'SwiftStack (SS)',
         authProvider: 'credentials',
@@ -762,12 +784,6 @@ export const api = {
     return { user: profile };
   },
 
-  /**
-   * Direct Frictionless Firebase Google Login:
-   * Invokes signInWithPopup SYNCHRONOUSLY inside the user click stack (never blocked by prior awaits),
-   * falls back automatically to signInWithRedirect if popups are blocked, and exposes zero-typing
-   * 1-click Google Account Selection when running inside unlisted sandbox preview domains.
-   */
   signInWithGoogle: async (
     rememberMe = true
   ): Promise<{
@@ -777,7 +793,6 @@ export const api = {
   }> => {
     googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
     try {
-      // Must call signInWithPopup immediately on the synchronous user-activation turn!
       const popupPromise = signInWithPopup(firebaseAuth, googleAuthProvider);
       const result = await popupPromise;
       const profile = mapFirebaseUserWithRoles(result.user);
@@ -813,7 +828,6 @@ export const api = {
     }
   },
 
-  // Instant 1-Click Google Account Selection (Zero manual email/name typing!)
   selectGoogleAccountInstant: async (
     option: QuickGoogleAccountOption,
     rememberMe = true
