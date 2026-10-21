@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="ssGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="50%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <filter id="neonDrop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#06b6d4" flood-opacity="0.55" />
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#050b1a" stroke="url(#ssGlow)" stroke-width="3.5" filter="url(#neonDrop)" />
+  <rect x="8" y="8" width="48" height="48" rx="11" fill="url(#ssGlow)" fill-opacity="0.16" />
+  <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="25" letter-spacing="-1" fill="url(#ssGlow)">SS</text>
+</svg>

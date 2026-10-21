@@ -1,4 +1,14 @@
+export type ThemeMode = 'glass' | 'dark' | 'light' | 'cyber';
+
 export type CharacterPresetStyle = 'executive-polo' | 'midnight-blazer' | 'tech-minimalist';
+
+export interface SiteBrandingMeta {
+  pageTitle: string;
+  metaDescription: string;
+  faviconUrl: string;
+  faviconMonogram: string;
+  profileIconUrl: string;
+}
 
 export interface CharacterConfig {
   presetStyle: CharacterPresetStyle;
@@ -38,6 +48,7 @@ export interface HeroCMS {
 }
 
 export interface ThemeCMS {
+  defaultMode: ThemeMode;
   backgroundHex: string;
   primaryAccent: string;
   secondaryAccent: string;
@@ -96,6 +107,23 @@ export interface InquiryItem {
   updatedAt: string;
 }
 
+export interface SubAdminPermissions {
+  canManageServices: boolean;
+  canManageProjects: boolean;
+  canManageOrders: boolean;
+}
+
+export interface SubAdminAccount {
+  id: string;
+  displayName: string;
+  username: string;
+  email: string;
+  password: string;
+  permissions: SubAdminPermissions;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -104,14 +132,17 @@ export interface UserProfile {
   company: string;
   avatarUrl?: string;
   authProvider: 'credentials' | 'google';
-  role: 'owner' | 'client';
+  role: 'owner' | 'subadmin' | 'client';
+  permissions?: SubAdminPermissions;
   createdAt: string;
 }
 
 export interface SiteCMSData {
+  branding: SiteBrandingMeta;
   hero: HeroCMS;
   theme: ThemeCMS;
   character: CharacterConfig;
   services: ServiceItem[];
   projects: ProjectItem[];
+  subAdmins: SubAdminAccount[];
 }

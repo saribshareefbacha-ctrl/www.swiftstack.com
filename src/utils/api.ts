@@ -1,7 +1,10 @@
 import {
+  browserLocalPersistence,
+  browserSessionPersistence,
   createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -28,16 +31,23 @@ import {
   InquiryItem,
   ProjectItem,
   ServiceItem,
+  SiteBrandingMeta,
   SiteCMSData,
+  SubAdminAccount,
+  SubAdminPermissions,
   ThemeCMS,
+  ThemeMode,
   UserProfile,
 } from '../types/cms';
 
-const TOKEN_STORAGE_KEY = 'swiftstack_session_token_v2';
-const OWNER_SESSION_KEY = 'swiftstack_owner_session_v2';
-const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v2';
-const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v2';
-const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v2';
+const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v3';
+const SESSION_ONLY_KEY = 'swiftstack_session_temp_v3';
+const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v3';
+const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v3';
+const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v3';
+export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v3';
+
+const OWNER_GOOGLE_EMAILS = ['sarib@swiftstack.com', 'saribshareefbacha@gmail.com'];
 
 const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site');
 const ORDERS_COL = collection(firestoreDb, 'swiftstack_orders');
@@ -61,35 +71,81 @@ export function subscribeSyncState(fn: (s: CloudSyncState) => void): () => void 
   };
 }
 
-export function getStoredToken(): string | null {
+export function getSavedThemeMode(): ThemeMode | null {
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setStoredToken(token: string | null) {
-  try {
-    if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+    const val = localStorage.getItem(THEME_STORAGE_KEY);
+    if (val === 'glass' || val === 'dark' || val === 'light' || val === 'cyber') {
+      return val;
+    }
   } catch {
     // ignore
   }
+  return null;
+}
+
+export function saveThemeMode(mode: ThemeMode) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', mode);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function getStoredUserSession(): UserProfile | null {
+  try {
+    const localRaw = localStorage.getItem(PERSISTED_SESSION_KEY);
+    if (localRaw) return JSON.parse(localRaw) as UserProfile;
+    const tempRaw = sessionStorage.getItem(SESSION_ONLY_KEY);
+    if (tempRaw) return JSON.parse(tempRaw) as UserProfile;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveUserSession(profile: UserProfile | null, rememberMe = true) {
+  try {
+    if (!profile) {
+      localStorage.removeItem(PERSISTED_SESSION_KEY);
+      sessionStorage.removeItem(SESSION_ONLY_KEY);
+      return;
+    }
+    if (rememberMe) {
+      localStorage.setItem(PERSISTED_SESSION_KEY, JSON.stringify(profile));
+      sessionStorage.removeItem(SESSION_ONLY_KEY);
+    } else {
+      sessionStorage.setItem(SESSION_ONLY_KEY, JSON.stringify(profile));
+      localStorage.removeItem(PERSISTED_SESSION_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
+  const base = structuredClone(DEFAULT_CMS_DATA);
+  if (!raw) return base;
+  return {
+    ...base,
+    ...raw,
+    branding: { ...base.branding, ...(raw.branding || {}) },
+    hero: { ...base.hero, ...(raw.hero || {}) },
+    theme: { ...base.theme, ...(raw.theme || {}) },
+    character: { ...base.character, ...(raw.character || {}) },
+    services: Array.isArray(raw.services) ? raw.services : base.services,
+    projects: Array.isArray(raw.projects) ? raw.projects : base.projects,
+    subAdmins: Array.isArray(raw.subAdmins) ? raw.subAdmins : base.subAdmins,
+  };
 }
 
 function getCachedCMS(): SiteCMSData {
   try {
     const raw = localStorage.getItem(LOCAL_CMS_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SiteCMSData>;
-      return {
-        ...structuredClone(DEFAULT_CMS_DATA),
-        ...parsed,
-        hero: { ...DEFAULT_CMS_DATA.hero, ...(parsed.hero || {}) },
-        theme: { ...DEFAULT_CMS_DATA.theme, ...(parsed.theme || {}) },
-        character: { ...DEFAULT_CMS_DATA.character, ...(parsed.character || {}) },
-      };
+      return normalizeCMS(JSON.parse(raw) as Partial<SiteCMSData>);
     }
   } catch {
     // ignore
@@ -155,12 +211,47 @@ function saveCachedClients(list: UserProfile[]) {
   }
 }
 
-function mapFirebaseUser(fbUser: FirebaseUser, company = ''): UserProfile {
+function mapFirebaseUserWithRoles(fbUser: FirebaseUser, company = ''): UserProfile {
+  const emailLower = (fbUser.email || '').trim().toLowerCase();
+  const cms = getCachedCMS();
+
+  if (OWNER_GOOGLE_EMAILS.includes(emailLower)) {
+    return {
+      id: fbUser.uid,
+      username: 'admin',
+      email: emailLower,
+      displayName: fbUser.displayName || 'Muhammad Sarib Randhawa',
+      company: 'SwiftStack (SS)',
+      avatarUrl: fbUser.photoURL || './images/ceo-3d-polo.webp',
+      authProvider: 'google',
+      role: 'owner',
+      createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
+    };
+  }
+
+  const matchedSub = cms.subAdmins.find(
+    (sa) => sa.active && sa.email.trim().toLowerCase() === emailLower
+  );
+  if (matchedSub) {
+    return {
+      id: fbUser.uid,
+      username: matchedSub.username,
+      email: emailLower,
+      displayName: fbUser.displayName || matchedSub.displayName,
+      company: 'SwiftStack Team',
+      avatarUrl: fbUser.photoURL || '',
+      authProvider: 'google',
+      role: 'subadmin',
+      permissions: matchedSub.permissions,
+      createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
+    };
+  }
+
   return {
     id: fbUser.uid,
-    username: (fbUser.email || 'user').split('@')[0],
-    email: fbUser.email || '',
-    displayName: fbUser.displayName || (fbUser.email || 'Client').split('@')[0],
+    username: (emailLower || 'user').split('@')[0],
+    email: emailLower,
+    displayName: fbUser.displayName || (emailLower || 'Client').split('@')[0],
     company,
     avatarUrl: fbUser.photoURL || '',
     authProvider: fbUser.providerData.some((p) => p.providerId === 'google.com')
@@ -179,7 +270,6 @@ async function persistFullCMSToCloud(next: SiteCMSData): Promise<SiteCMSData> {
   } catch {
     setSyncState('fallback');
   }
-  // Best-effort sync to optional local Express server if active
   fetch('./api/cms/sync', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -191,42 +281,30 @@ async function persistFullCMSToCloud(next: SiteCMSData): Promise<SiteCMSData> {
 export const api = {
   // Real-time Firestore listener for CMS Site Data
   subscribeCMS: (onUpdate: (data: SiteCMSData) => void): (() => void) => {
-    // Immediately hydrate from cache/seed in 0ms
     onUpdate(getCachedCMS());
 
-    // Fetch server state if Express backend is active
     fetch('./api/cms')
       .then(async (res) => {
         if (res.ok && (res.headers.get('content-type') || '').includes('application/json')) {
-          const remote = (await res.json()) as SiteCMSData;
+          const remote = (await res.json()) as Partial<SiteCMSData>;
           if (remote?.hero) {
-            saveCachedCMS(remote);
-            onUpdate(remote);
+            const normalized = normalizeCMS(remote);
+            saveCachedCMS(normalized);
+            onUpdate(normalized);
           }
         }
       })
       .catch(() => {});
 
-    // Attach real-time Firebase Firestore listener
     const unsubscribe = onSnapshot(
       CMS_DOC_REF,
       (snap) => {
         setSyncState('live');
         if (snap.exists()) {
-          const cloud = snap.data() as SiteCMSData;
-          const merged: SiteCMSData = {
-            ...getCachedCMS(),
-            ...cloud,
-            hero: { ...DEFAULT_CMS_DATA.hero, ...(cloud.hero || {}) },
-            theme: { ...DEFAULT_CMS_DATA.theme, ...(cloud.theme || {}) },
-            character: { ...DEFAULT_CMS_DATA.character, ...(cloud.character || {}) },
-            services: Array.isArray(cloud.services) ? cloud.services : DEFAULT_CMS_DATA.services,
-            projects: Array.isArray(cloud.projects) ? cloud.projects : DEFAULT_CMS_DATA.projects,
-          };
+          const merged = normalizeCMS(snap.data() as Partial<SiteCMSData>);
           saveCachedCMS(merged);
           onUpdate(merged);
         } else {
-          // Initialize Firestore document cleanly on first visit
           const seed = getCachedCMS();
           setDoc(CMS_DOC_REF, seed).catch(() => {});
         }
@@ -253,7 +331,6 @@ export const api = {
           saveCachedOrders(list);
           onUpdate(list);
         } else {
-          // Seed initial orders cleanly if empty
           const seeded = getCachedOrders();
           seeded.forEach((item) => {
             setDoc(doc(firestoreDb, 'swiftstack_orders', item.id), item).catch(() => {});
@@ -268,23 +345,18 @@ export const api = {
     return unsubscribe;
   },
 
-  // Auth Session Observer (Firebase Auth + Hidden Owner Elevation)
+  // Auth Session Observer with LocalStorage Persistence
   subscribeAuth: (onUser: (user: UserProfile | null) => void): (() => void) => {
-    // Check if hidden owner session is active
-    try {
-      const savedOwner = localStorage.getItem(OWNER_SESSION_KEY);
-      if (savedOwner) {
-        onUser(JSON.parse(savedOwner) as UserProfile);
-      }
-    } catch {
-      // ignore
+    const saved = getStoredUserSession();
+    if (saved) {
+      onUser(saved);
     }
 
-    // Complete any mobile Google redirect login seamlessly
     getRedirectResult(firebaseAuth)
       .then((res) => {
         if (res?.user) {
-          const profile = mapFirebaseUser(res.user);
+          const profile = mapFirebaseUserWithRoles(res.user);
+          saveUserSession(profile, true);
           setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
             () => {}
           );
@@ -294,14 +366,17 @@ export const api = {
       .catch(() => {});
 
     const unsub = onAuthStateChanged(firebaseAuth, (fbUser) => {
-      try {
-        if (localStorage.getItem(OWNER_SESSION_KEY)) return;
-      } catch {
-        // ignore
+      const existing = getStoredUserSession();
+      if (existing && (existing.role === 'owner' || existing.role === 'subadmin')) {
+        onUser(existing);
+        return;
       }
       if (fbUser) {
-        const profile = mapFirebaseUser(fbUser);
+        const profile = mapFirebaseUserWithRoles(fbUser);
+        saveUserSession(profile, true);
         onUser(profile);
+      } else if (existing) {
+        onUser(existing);
       } else {
         onUser(null);
       }
@@ -310,7 +385,13 @@ export const api = {
     return unsub;
   },
 
-  // CMS Section Updates
+  // Master Branding & Meta Updates
+  updateBranding: async (branding: SiteBrandingMeta): Promise<{ branding: SiteBrandingMeta }> => {
+    const next = { ...getCachedCMS(), branding };
+    await persistFullCMSToCloud(next);
+    return { branding };
+  },
+
   updateHero: async (hero: HeroCMS): Promise<{ hero: HeroCMS }> => {
     const next = { ...getCachedCMS(), hero };
     await persistFullCMSToCloud(next);
@@ -333,6 +414,54 @@ export const api = {
     const fresh = structuredClone(DEFAULT_CMS_DATA);
     await persistFullCMSToCloud(fresh);
     return fresh;
+  },
+
+  // Sub-Admin Authorization & Management (Master Owner Only)
+  createSubAdmin: async (payload: {
+    displayName: string;
+    username: string;
+    email: string;
+    password: string;
+    permissions: SubAdminPermissions;
+  }): Promise<{ subAdmin: SubAdminAccount }> => {
+    const cms = getCachedCMS();
+    const created: SubAdminAccount = {
+      id: `sub-${Date.now().toString(36)}`,
+      displayName: payload.displayName.trim(),
+      username: payload.username.trim().toLowerCase(),
+      email: payload.email.trim().toLowerCase(),
+      password: payload.password,
+      permissions: payload.permissions,
+      active: true,
+      createdAt: new Date().toISOString(),
+    };
+    cms.subAdmins = [created, ...cms.subAdmins];
+    await persistFullCMSToCloud(cms);
+    return { subAdmin: created };
+  },
+
+  updateSubAdmin: async (
+    id: string,
+    patch: Partial<SubAdminAccount>
+  ): Promise<{ subAdmin: SubAdminAccount }> => {
+    const cms = getCachedCMS();
+    let updatedItem: SubAdminAccount | null = null;
+    cms.subAdmins = cms.subAdmins.map((sa) => {
+      if (sa.id === id) {
+        updatedItem = { ...sa, ...patch, id };
+        return updatedItem;
+      }
+      return sa;
+    });
+    await persistFullCMSToCloud(cms);
+    return { subAdmin: updatedItem! };
+  },
+
+  deleteSubAdmin: async (id: string): Promise<{ deleted: string }> => {
+    const cms = getCachedCMS();
+    cms.subAdmins = cms.subAdmins.filter((sa) => sa.id !== id);
+    await persistFullCMSToCloud(cms);
+    return { deleted: id };
   },
 
   // Services CRUD
@@ -426,11 +555,15 @@ export const api = {
     return { deleted: id };
   },
 
-  // Unified Sign-In: Supports Hidden Admin ('admin' / 'admin') + Firebase Auth
-  login: async (identifier: string, password: string): Promise<{ user: UserProfile }> => {
+  // Unified Sign-In: Supports Master Owner ('admin'/'admin'), Sub-Admins, & Firebase Auth + Remember Me
+  login: async (
+    identifier: string,
+    password: string,
+    rememberMe = true
+  ): Promise<{ user: UserProfile }> => {
     const clean = identifier.trim().toLowerCase();
 
-    // Hidden Owner Elevation ('admin' / 'admin')
+    // 1. Master Owner Elevation ('admin' / 'admin')
     if (clean === 'admin' && password === 'admin') {
       const ownerProfile: UserProfile = {
         id: 'owner-sarib-randhawa',
@@ -438,22 +571,47 @@ export const api = {
         email: 'sarib@swiftstack.com',
         displayName: 'Muhammad Sarib Randhawa',
         company: 'SwiftStack (SS)',
-        avatarUrl: './images/ceo-3d-polo.png',
+        avatarUrl: './images/ceo-3d-polo.webp',
         authProvider: 'credentials',
         role: 'owner',
         createdAt: new Date().toISOString(),
       };
-      try {
-        localStorage.setItem(OWNER_SESSION_KEY, JSON.stringify(ownerProfile));
-      } catch {
-        // ignore
-      }
+      saveUserSession(ownerProfile, rememberMe);
       return { user: ownerProfile };
     }
 
-    // Standard Client Email/Password Sign-In via Firebase Auth
+    // 2. Authorized Sub-Admin Login
+    const cms = getCachedCMS();
+    const matchedSub = cms.subAdmins.find(
+      (sa) =>
+        sa.active &&
+        (sa.username.toLowerCase() === clean || sa.email.toLowerCase() === clean) &&
+        sa.password === password
+    );
+    if (matchedSub) {
+      const subProfile: UserProfile = {
+        id: matchedSub.id,
+        username: matchedSub.username,
+        email: matchedSub.email,
+        displayName: matchedSub.displayName,
+        company: 'SwiftStack Team',
+        authProvider: 'credentials',
+        role: 'subadmin',
+        permissions: matchedSub.permissions,
+        createdAt: matchedSub.createdAt,
+      };
+      saveUserSession(subProfile, rememberMe);
+      return { user: subProfile };
+    }
+
+    // 3. Standard Client Sign-In via Firebase Auth with Persistence Mode
+    await setPersistence(
+      firebaseAuth,
+      rememberMe ? browserLocalPersistence : browserSessionPersistence
+    );
     const credential = await signInWithEmailAndPassword(firebaseAuth, clean, password);
-    const profile = mapFirebaseUser(credential.user);
+    const profile = mapFirebaseUserWithRoles(credential.user);
+    saveUserSession(profile, rememberMe);
     return { user: profile };
   },
 
@@ -463,16 +621,23 @@ export const api = {
     email: string;
     password: string;
     company?: string;
+    rememberMe?: boolean;
   }): Promise<{ user: UserProfile }> => {
     const email = payload.email.trim().toLowerCase();
     if (email === 'admin') {
       throw new Error('This identifier is reserved.');
     }
+    const remember = payload.rememberMe !== false;
+    await setPersistence(
+      firebaseAuth,
+      remember ? browserLocalPersistence : browserSessionPersistence
+    );
     const credential = await createUserWithEmailAndPassword(firebaseAuth, email, payload.password);
     await updateFirebaseProfile(credential.user, {
       displayName: payload.displayName.trim(),
     });
-    const profile = mapFirebaseUser(credential.user, (payload.company || '').trim());
+    const profile = mapFirebaseUserWithRoles(credential.user, (payload.company || '').trim());
+    saveUserSession(profile, remember);
     const existing = getCachedClients();
     saveCachedClients([profile, ...existing.filter((c) => c.email !== profile.email)]);
     await setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
@@ -481,11 +646,14 @@ export const api = {
     return { user: profile };
   },
 
-  // Google Sign-In via Firebase Authentication
+  // Google Sign-In via Firebase Authentication (Popup + Redirect Fallback + Persistence)
   signInWithGoogle: async (): Promise<{ user: UserProfile | null; redirecting?: boolean }> => {
     try {
+      await setPersistence(firebaseAuth, browserLocalPersistence);
+      googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(firebaseAuth, googleAuthProvider);
-      const profile = mapFirebaseUser(result.user);
+      const profile = mapFirebaseUserWithRoles(result.user);
+      saveUserSession(profile, true);
       const existing = getCachedClients();
       saveCachedClients([profile, ...existing.filter((c) => c.email !== profile.email)]);
       await setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, {
@@ -502,22 +670,26 @@ export const api = {
     }
   },
 
-  // Guest / Instant Email Fallback for Unlisted Preview Domains
+  // Instant Google Identity Bridge for Unlisted Preview Domains
   quickClientSession: async (payload: {
     email: string;
     displayName: string;
     company?: string;
   }): Promise<{ user: UserProfile }> => {
+    const emailLower = payload.email.trim().toLowerCase();
+    const isMaster = OWNER_GOOGLE_EMAILS.includes(emailLower);
     const profile: UserProfile = {
-      id: `client-${Date.now().toString(36)}`,
-      username: payload.email.split('@')[0],
-      email: payload.email.trim().toLowerCase(),
+      id: `google-${Date.now().toString(36)}`,
+      username: emailLower.split('@')[0],
+      email: emailLower,
       displayName: payload.displayName.trim(),
       company: (payload.company || '').trim(),
+      avatarUrl: isMaster ? './images/ceo-3d-polo.webp' : '',
       authProvider: 'google',
-      role: 'client',
+      role: isMaster ? 'owner' : 'client',
       createdAt: new Date().toISOString(),
     };
+    saveUserSession(profile, true);
     const existing = getCachedClients();
     saveCachedClients([profile, ...existing.filter((c) => c.email !== profile.email)]);
     await setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
@@ -540,6 +712,7 @@ export const api = {
       displayName: payload.displayName,
       company: payload.company,
     };
+    saveUserSession(updated, true);
     await setDoc(doc(firestoreDb, 'swiftstack_users', updated.id), updated, { merge: true }).catch(
       () => {}
     );
@@ -547,15 +720,11 @@ export const api = {
   },
 
   logout: async (): Promise<void> => {
-    try {
-      localStorage.removeItem(OWNER_SESSION_KEY);
-    } catch {
-      // ignore
-    }
+    saveUserSession(null);
     await signOut(firebaseAuth).catch(() => {});
   },
 
-  // Orders & Inquiries CRUD (Real-time Firestore + Local Mirror)
+  // Orders & Inquiries CRUD
   submitInquiry: async (payload: {
     clientId?: string | null;
     clientName: string;
@@ -638,11 +807,5 @@ export const api = {
       // ignore
     }
     return { clients: getCachedClients() };
-  },
-
-  deleteClient: async (id: string): Promise<{ deleted: string }> => {
-    saveCachedClients(getCachedClients().filter((c) => c.id !== id));
-    await deleteDoc(doc(firestoreDb, 'swiftstack_users', id)).catch(() => {});
-    return { deleted: id };
   },
 };

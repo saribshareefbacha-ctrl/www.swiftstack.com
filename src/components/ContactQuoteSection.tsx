@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Globe2, Mail, Send, ShieldCheck, Sparkles } from 'lucide-react';
 import { HeroCMS, ServiceItem, ThemeCMS, UserProfile } from '../types/cms';
 import { api } from '../utils/api';
+import { SwiftStackLogo } from './SwiftStackLogo';
 
 interface ContactQuoteSectionProps {
   hero: HeroCMS;
@@ -77,7 +78,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
             {/* Left Direct Agency Overview */}
             <div className="lg:col-span-5 space-y-6">
-              <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-300">
+              <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-400">
                 <Sparkles className="w-4 h-4 text-cyan-400" />
                 <span>Start Your Order</span>
               </div>
@@ -94,13 +95,13 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                 </span>
               </h2>
 
-              <p className="text-slate-300/90 text-base leading-relaxed">
+              <p className="text-slate-300 text-base leading-relaxed">
                 {hero.orderSubheading ||
                   'Submit your project requirements, SaaS roadmap, mobile app scope, or AI media package. Muhammad Sarib Randhawa reviews every inquiry directly and responds with a tailored architecture and milestone quote.'}
               </p>
 
               <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
+                <div className="ss-glass-card flex items-center gap-3.5 p-4 rounded-2xl border">
                   <Mail className="w-5 h-5 text-cyan-400 shrink-0" />
                   <div>
                     <div className="text-xs font-mono text-slate-400">Direct Executive Desk</div>
@@ -108,7 +109,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
+                <div className="ss-glass-card flex items-center gap-3.5 p-4 rounded-2xl border">
                   <Globe2 className="w-5 h-5 text-cyan-400 shrink-0" />
                   <div>
                     <div className="text-xs font-mono text-slate-400">
@@ -120,12 +121,13 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
+                <div className="ss-glass-card flex items-center gap-3.5 p-4 rounded-2xl border">
                   <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" />
                   <div>
                     <div className="text-xs font-mono text-slate-400">Real-Time Client Portal</div>
                     <div className="text-sm text-slate-300">
-                      Sign in with Google or your email anytime to track live order status and quotes.
+                      Sign in with Google or your email anytime to track live order status and
+                      quotes.
                     </div>
                   </div>
                 </div>
@@ -135,12 +137,9 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
             {/* Right Interactive Order & Quote Form */}
             <form
               onSubmit={handleSubmit}
-              style={{
-                backgroundColor: `rgba(15, 23, 42, ${theme.glassOpacity})`,
-              }}
-              className="lg:col-span-7 rounded-3xl border border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl space-y-5"
+              className="ss-glass-card lg:col-span-7 rounded-3xl border p-6 sm:p-8 shadow-2xl space-y-5"
             >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center justify-between border-b border-slate-700/40 pb-4">
                 <div>
                   <h3 className="font-display font-bold text-xl text-white">
                     Place an Order or Request Quote
@@ -149,19 +148,19 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     Real-time cloud sync · Full technical scope &amp; milestone estimate
                   </p>
                 </div>
-                <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+                <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-cyan-500/15 text-cyan-400 border border-cyan-400/30">
                   SwiftStack (SS)
                 </span>
               </div>
 
               {errorMsg && (
-                <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-400/40 text-xs text-red-200">
+                <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-400/40 text-xs text-red-400">
                   {errorMsg}
                 </div>
               )}
 
               {submittedSuccess && (
-                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center gap-3 text-sm text-emerald-200">
+                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center gap-3 text-sm text-emerald-400">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <span>
                     Order received! Your brief is synced to SwiftStack Cloud — open your Client
@@ -181,7 +180,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     placeholder="Alex Rivera"
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -195,7 +194,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     placeholder="alex@company.com"
                     value={clientEmail}
                     onChange={(e) => setClientEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   />
                 </div>
               </div>
@@ -210,7 +209,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     placeholder="Optional organization"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
@@ -221,7 +220,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   <select
                     value={serviceTitle}
                     onChange={(e) => setServiceTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   >
                     {services.map((srv) => (
                       <option key={srv.id} value={srv.title}>
@@ -243,7 +242,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   <select
                     value={budgetRange}
                     onChange={(e) => setBudgetRange(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   >
                     <option value="$1,500 – $3,000">$1,500 – $3,000</option>
                     <option value="$3,000 – $7,500">$3,000 – $7,500</option>
@@ -259,7 +258,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   <select
                     value={timeline}
                     onChange={(e) => setTimeline(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400"
                   >
                     <option value="Urgent (< 2 Weeks)">Urgent (&lt; 2 Weeks)</option>
                     <option value="2 – 4 Weeks">2 – 4 Weeks</option>
@@ -279,14 +278,14 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                   placeholder="Describe your product goals, key features, timeline, or target audience..."
                   value={projectDetails}
                   onChange={(e) => setProjectDetails(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400 resize-none"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/60 text-sm text-white focus:outline-none focus:border-cyan-400 resize-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-3.5 px-6 rounded-2xl font-display font-bold text-sm sm:text-base text-slate-950 flex items-center justify-center gap-2 shadow-[0_0_28px_rgba(6,182,212,0.35)] hover:opacity-95 transition-all disabled:opacity-60"
+                className="keep-white-text w-full py-3.5 px-6 rounded-2xl font-display font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-[0_0_28px_rgba(6,182,212,0.35)] hover:opacity-95 transition-all disabled:opacity-60"
                 style={{
                   background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
                 }}
@@ -300,17 +299,16 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
       </section>
 
       {/* Clean Public Footer (Strictly zero visible Admin/CMS links) */}
-      <footer className="border-t border-white/10 bg-slate-950/80 backdrop-blur-xl py-12">
+      <footer className="ss-nav-surface border-t py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-xs text-white"
-              style={{
-                background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent}, ${theme.tertiaryAccent})`,
-              }}
-            >
-              {hero.companyAbbreviation}
-            </div>
+            <SwiftStackLogo
+              monogram={hero.companyAbbreviation}
+              primaryColor={theme.primaryAccent}
+              secondaryColor={theme.secondaryAccent}
+              iconOnly
+              size={38}
+            />
             <div>
               <div className="font-display font-bold text-sm text-white">
                 {hero.companyName} ({hero.companyAbbreviation}) · Founded by {hero.founderName}
@@ -322,16 +320,16 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-xs text-slate-400">
-            <a href="#hero" className="hover:text-white transition-colors">
+            <a href="#hero" className="hover:text-cyan-400 transition-colors">
               Overview
             </a>
-            <a href="#services" className="hover:text-white transition-colors">
+            <a href="#services" className="hover:text-cyan-400 transition-colors">
               Services
             </a>
-            <a href="#projects" className="hover:text-white transition-colors">
+            <a href="#projects" className="hover:text-cyan-400 transition-colors">
               Projects
             </a>
-            <a href="#order" className="hover:text-white transition-colors">
+            <a href="#order" className="hover:text-cyan-400 transition-colors">
               Order &amp; Quote
             </a>
             <span>

@@ -1,22 +1,78 @@
-import { CharacterConfig, CharacterPresetStyle, InquiryItem, SiteCMSData } from '../types/cms';
+import {
+  CharacterConfig,
+  CharacterPresetStyle,
+  InquiryItem,
+  SiteBrandingMeta,
+  SiteCMSData,
+  SubAdminAccount,
+} from '../types/cms';
+
+export interface CharacterFrameSet {
+  idle: string;
+  open: string;
+  wave?: string;
+}
+
+export const CHARACTER_PRESET_FRAMES: Record<CharacterPresetStyle, CharacterFrameSet> = {
+  'executive-polo': {
+    idle: './images/ceo-3d-polo.webp',
+    open: './images/ceo-3d-polo-open.webp',
+    wave: './images/ceo-3d-polo-wave.webp',
+  },
+  'midnight-blazer': {
+    idle: './images/ceo-3d-blazer.webp',
+    open: './images/ceo-3d-blazer-open.webp',
+  },
+  'tech-minimalist': {
+    idle: './images/ceo-3d-tech.webp',
+    open: './images/ceo-3d-tech-open.webp',
+  },
+};
 
 export const CHARACTER_PRESET_IMAGES: Record<CharacterPresetStyle, string> = {
-  'executive-polo': './images/ceo-3d-polo.png',
-  'midnight-blazer': './images/ceo-3d-blazer.png',
-  'tech-minimalist': './images/ceo-3d-tech.png',
+  'executive-polo': './images/ceo-3d-polo.webp',
+  'midnight-blazer': './images/ceo-3d-blazer.webp',
+  'tech-minimalist': './images/ceo-3d-tech.webp',
+};
+
+export const DEFAULT_BRANDING_META: SiteBrandingMeta = {
+  pageTitle: 'SwiftStack (SS) — Muhammad Sarib Randhawa | Digital Agency & Full-Stack Studio',
+  metaDescription:
+    'SwiftStack (SS), founded and owned by Muhammad Sarib Randhawa — full-stack web & SaaS engineering, mobile apps, cloud security, and AI media creation.',
+  faviconUrl: '',
+  faviconMonogram: 'SS',
+  profileIconUrl: '',
 };
 
 export const DEFAULT_CHARACTER_CONFIG: CharacterConfig = {
   presetStyle: 'executive-polo',
   customImageUrl: '',
-  greetingBadgeText: 'Founder & CEO · SwiftStack',
+  greetingBadgeText: 'Founder & CEO · Live Studio',
   gestureAnimation: 'subtle',
   auraColor: '#06b6d4',
   voiceRate: 1.0,
   voicePitch: 1.02,
 };
 
+export const DEFAULT_SUB_ADMINS: SubAdminAccount[] = [
+  {
+    id: 'subadmin-ops-1',
+    displayName: 'SwiftStack Operations Lead',
+    username: 'subadmin',
+    email: 'ops@swiftstack.com',
+    password: 'password123',
+    permissions: {
+      canManageServices: true,
+      canManageProjects: true,
+      canManageOrders: true,
+    },
+    active: true,
+    createdAt: '2026-10-21T08:00:00.000Z',
+  },
+];
+
 export const DEFAULT_CMS_DATA: SiteCMSData = {
+  branding: DEFAULT_BRANDING_META,
   hero: {
     companyName: 'SwiftStack',
     companyAbbreviation: 'SS',
@@ -24,13 +80,13 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
     headlinePrefix: 'Engineering High-Impact',
     headlineHighlight: 'Web, Full-Stack & AI Solutions',
     subheadline:
-      'Founded and led by Muhammad Sarib Randhawa, SwiftStack (SS) partners with ambitious brands and founders to ship fast full-stack web platforms, custom mobile apps, cloud infrastructure, and iconic AI-powered brand experiences.',
+      'Founded and owned by Muhammad Sarib Randhawa, SwiftStack (SS) partners with ambitious brands and founders to ship fast full-stack web platforms, custom mobile apps, cloud infrastructure, and iconic AI-powered brand experiences.',
     founderName: 'Muhammad Sarib Randhawa',
     founderTitle: 'Founder & CEO — SwiftStack (SS)',
     founderBio:
       'At SwiftStack (SS), every product is engineered for conversion, speed, and unmistakable polish — spanning full-stack web & mobile apps, automated cloud & SSL deployments, minimalist brand systems, and flagship content channels like @SoulSyllables.',
     voiceGreeting:
-      'Hi there! I am Muhammad Sarib Randhawa, Founder & CEO of SwiftStack. Welcome to our digital studio! Explore our full-stack web, mobile, cloud, and AI media services, check out our featured work, or submit an order anytime to launch your next project.',
+      'Hi there! I am Muhammad Sarib Randhawa, Founder & CEO of SwiftStack. Welcome to our digital studio! Explore our full-stack web, mobile, cloud, and AI media services, check out our featured client projects, or submit your project brief right here to get started.',
     primaryCtaLabel: 'Start Your Order',
     secondaryCtaLabel: 'Explore Featured Work',
     servicesHeadingPrefix: 'Full-Spectrum Engineering,',
@@ -50,16 +106,18 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
     socialHandle: '@SoulSyllables',
   },
   theme: {
-    backgroundHex: '#050b1a',
+    defaultMode: 'glass',
+    backgroundHex: '#050c1d',
     primaryAccent: '#06b6d4',
-    secondaryAccent: '#3b82f6',
-    tertiaryAccent: '#6366f1',
-    glassOpacity: 0.72,
+    secondaryAccent: '#6366f1',
+    tertiaryAccent: '#22d3ee',
+    glassOpacity: 0.62,
     particleDensity: 150,
     scrollSpeed: 1.0,
     wireframeOpacity: 0.18,
   },
   character: DEFAULT_CHARACTER_CONFIG,
+  subAdmins: DEFAULT_SUB_ADMINS,
   services: [
     {
       id: 'srv-3d-web',
@@ -69,9 +127,9 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
         'Bespoke high-speed web interfaces built with HTML5, CSS3, TypeScript, React, and smooth motion graphics — engineered for crisp mobile responsiveness and conversion.',
       deliverables: [
         'React + TypeScript Architecture',
-        'Smooth Scroll & Motion Graphics',
+        'Multi-Theme Glass & Light UI',
         'Interactive Product Showcases',
-        'Mobile-First Glassmorphic UI',
+        'Sub-Second Mobile Performance',
       ],
       priceLabel: 'From $1,400',
       turnaround: '1 – 3 Weeks',
@@ -88,7 +146,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       deliverables: [
         'Node.js, Python & Firebase Backends',
         'Firestore / PostgreSQL / SQLite',
-        'Google OAuth & Secure Authentication',
+        'Google OAuth & Multi-Role Auth',
         'Real-Time Client & Order Portals',
       ],
       priceLabel: 'From $2,200',

@@ -52,7 +52,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-300">
+            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-400">
               <Sparkles className="w-4 h-4 text-cyan-400" />
               <span>Featured Portfolio &amp; Flagship Shipments</span>
             </div>
@@ -67,15 +67,13 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 {headingHighlight}
               </span>
             </h2>
-            <p className="text-slate-300/90 text-base sm:text-lg">
-              {subheading}
-            </p>
+            <p className="text-slate-300 text-base sm:text-lg">{subheading}</p>
           </div>
 
           {isOwner && (
             <button
               onClick={onManageProjects}
-              className="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 hover:bg-cyan-500/30 transition-colors"
+              className="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/30 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <Edit3 className="w-3.5 h-3.5" />
@@ -94,8 +92,8 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap border transition-all ${
                   active
-                    ? 'text-slate-950 font-semibold border-transparent shadow-lg'
-                    : 'text-slate-300 bg-slate-900/60 border-white/10 hover:bg-white/10'
+                    ? 'keep-white-text font-semibold border-transparent shadow-lg'
+                    : 'ss-glass-card text-slate-300 hover:border-cyan-400/50 hover:text-white'
                 }`}
                 style={
                   active
@@ -121,10 +119,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.55, delay: (idx % 2) * 0.1 }}
               onClick={() => setActiveProject(project)}
-              style={{
-                backgroundColor: `rgba(15, 23, 42, ${theme.glassOpacity})`,
-              }}
-              className="group cursor-pointer rounded-3xl border border-white/10 hover:border-cyan-400/50 backdrop-blur-xl overflow-hidden shadow-[0_20px_60px_rgba(2,6,23,0.75)] flex flex-col transition-all"
+              className="ss-glass-card group cursor-pointer rounded-3xl border hover:border-cyan-400/50 overflow-hidden flex flex-col transition-all"
             >
               {/* Widescreen Visual Preview */}
               <div className="relative h-64 sm:h-72 overflow-hidden bg-slate-950">
@@ -133,14 +128,20 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                   alt={project.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
 
-                {/* Floating Category & Year Badge */}
+                {/* Floating Category & Year Badge (Over Dark Photo) */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full text-xs font-mono font-medium bg-slate-950/85 text-cyan-300 border border-cyan-400/35 backdrop-blur-md">
+                  <span
+                    className="px-3 py-1 rounded-full text-xs font-mono font-medium backdrop-blur-md border border-cyan-400/40"
+                    style={{ backgroundColor: 'rgba(2, 6, 23, 0.85)', color: '#67e8f9' }}
+                  >
                     {project.category}
                   </span>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-950/80 text-slate-300 border border-white/15">
+                  <span
+                    className="px-2.5 py-1 rounded-full text-xs font-mono border border-white/15"
+                    style={{ backgroundColor: 'rgba(2, 6, 23, 0.85)', color: '#e2e8f0' }}
+                  >
                     {project.year}
                   </span>
                 </div>
@@ -148,7 +149,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 {/* Key Metric Pill */}
                 <div
                   className="absolute bottom-4 right-4 px-3.5 py-2 rounded-2xl backdrop-blur-xl border border-white/20 text-right shadow-lg"
-                  style={{ backgroundColor: 'rgba(2, 6, 23, 0.86)' }}
+                  style={{ backgroundColor: 'rgba(2, 6, 23, 0.88)' }}
                 >
                   <div
                     className="font-display font-extrabold text-base sm:text-lg leading-none"
@@ -156,7 +157,10 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                   >
                     {project.metricValue}
                   </div>
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mt-1">
+                  <div
+                    className="text-[10px] font-mono uppercase tracking-wider mt-1"
+                    style={{ color: '#cbd5e1' }}
+                  >
                     {project.metricLabel}
                   </div>
                 </div>
@@ -165,11 +169,11 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
               {/* Project Body */}
               <div className="p-6 sm:p-7 flex-1 flex flex-col justify-between space-y-5">
                 <div className="space-y-2.5">
-                  <div className="text-xs font-mono text-cyan-300">{project.subtitle}</div>
-                  <h3 className="font-display font-bold text-2xl text-white group-hover:text-cyan-200 transition-colors">
+                  <div className="text-xs font-mono text-cyan-400">{project.subtitle}</div>
+                  <h3 className="font-display font-bold text-2xl text-white group-hover:text-cyan-400 transition-colors">
                     {project.title}
                   </h3>
-                  <p className="text-sm text-slate-300/90 leading-relaxed line-clamp-3">
+                  <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
                     {project.description}
                   </p>
                 </div>
@@ -179,16 +183,16 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                     {project.tags.map((t, i) => (
                       <span
                         key={i}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-white/[0.06] text-slate-300 border border-white/10"
+                        className="ss-glass-card px-2.5 py-1 rounded-lg text-[11px] font-mono text-slate-300 border"
                       >
                         {t}
                       </span>
                     ))}
                   </div>
 
-                  <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+                  <div className="pt-3 border-t border-slate-700/40 flex items-center justify-between text-xs text-slate-400">
                     <span>Partner: {project.clientName}</span>
-                    <span className="inline-flex items-center gap-1 font-semibold text-cyan-300 group-hover:translate-x-0.5 transition-transform">
+                    <span className="inline-flex items-center gap-1 font-semibold text-cyan-400 group-hover:translate-x-0.5 transition-transform">
                       <span>Inspect Case Study</span>
                       <ArrowUpRight className="w-4 h-4" />
                     </span>
@@ -215,7 +219,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.94, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-slate-900 border border-white/15 shadow-2xl"
+              className="ss-modal-surface w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl"
             >
               <div className="relative h-72 sm:h-80 bg-slate-950">
                 <img
@@ -225,7 +229,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                 />
                 <button
                   onClick={() => setActiveProject(null)}
-                  className="absolute top-4 right-4 p-2.5 rounded-full bg-slate-950/85 text-white border border-white/15 hover:bg-slate-800"
+                  className="keep-white-text absolute top-4 right-4 p-2.5 rounded-full bg-slate-950/85 border border-white/15 hover:bg-slate-800"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -243,7 +247,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                   </div>
 
                   <div className="px-4 py-2.5 rounded-2xl bg-cyan-500/15 border border-cyan-400/35 text-right">
-                    <div className="font-display font-extrabold text-xl text-cyan-300">
+                    <div className="font-display font-extrabold text-xl text-cyan-400">
                       {activeProject.metricValue}
                     </div>
                     <div className="text-[11px] font-mono text-slate-300">
@@ -261,7 +265,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                   {activeProject.tags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-3 py-1 rounded-xl text-xs font-mono bg-slate-950 text-cyan-200 border border-white/10"
+                      className="ss-glass-card px-3 py-1 rounded-xl text-xs font-mono text-cyan-400 border"
                     >
                       {tag}
                     </span>
@@ -272,11 +276,11 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                   </span>
                 </div>
 
-                <div className="pt-4 border-t border-white/10 flex flex-wrap justify-end gap-3">
+                <div className="pt-4 border-t border-slate-700/40 flex flex-wrap justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setActiveProject(null)}
-                    className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-300 border border-white/15 hover:bg-white/5"
+                    className="ss-glass-card px-5 py-2.5 rounded-xl text-sm font-medium text-slate-300 border hover:border-cyan-400"
                   >
                     Close Preview
                   </button>
@@ -287,7 +291,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
                       setActiveProject(null);
                       onStartSimilarProject(title);
                     }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-950 shadow-lg"
+                    className="keep-white-text inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-lg"
                     style={{
                       background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
                     }}

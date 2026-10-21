@@ -36,7 +36,22 @@ export function getFullCMSData(): SiteCMSData {
     .prepare('SELECT payload FROM cms_snapshot WHERE id = ?')
     .get('live') as { payload: string } | undefined;
   if (!row) return DEFAULT_CMS_DATA;
-  return JSON.parse(row.payload) as SiteCMSData;
+  const parsed = JSON.parse(row.payload) as Partial<SiteCMSData>;
+  return {
+    branding: { ...DEFAULT_CMS_DATA.branding, ...(parsed.branding || {}) },
+    hero: { ...DEFAULT_CMS_DATA.hero, ...(parsed.hero || {}) },
+    character: { ...DEFAULT_CMS_DATA.character, ...(parsed.character || {}) },
+    services:
+      Array.isArray(parsed.services) && parsed.services.length > 0
+        ? parsed.services
+        : DEFAULT_CMS_DATA.services,
+    projects:
+      Array.isArray(parsed.projects) && parsed.projects.length > 0
+        ? parsed.projects
+        : DEFAULT_CMS_DATA.projects,
+    subAdmins: Array.isArray(parsed.subAdmins) ? parsed.subAdmins : DEFAULT_CMS_DATA.subAdmins,
+    theme: { ...DEFAULT_CMS_DATA.theme, ...(parsed.theme || {}) },
+  };
 }
 
 export function saveFullCMSData(data: SiteCMSData): SiteCMSData {

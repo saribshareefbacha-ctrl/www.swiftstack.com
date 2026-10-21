@@ -2,34 +2,183 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    background-color: #020617;
-    color: #f8fafc;
-    scroll-behavior: smooth;
-  }
+/* ============================================================================
+   SWIFTSTACK 4-MODE MULTI-THEME ENGINE (GLASS | DARK | LIGHT | CYBER)
+   Guarantees razor-sharp readability & zero contrast glitches in all 4 modes
+   ============================================================================ */
 
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background-color: #020617;
-  }
+:root,
+html[data-theme='glass'] {
+  --ss-bg: #050c1d;
+  --ss-surface: rgba(12, 22, 46, 0.56);
+  --ss-surface-elevated: rgba(9, 17, 36, 0.88);
+  --ss-surface-input: rgba(4, 10, 24, 0.72);
+  --ss-border: rgba(148, 163, 184, 0.24);
+  --ss-border-strong: rgba(34, 211, 238, 0.45);
+  --ss-text: #f8fafc;
+  --ss-text-secondary: #cbd5e1;
+  --ss-text-muted: #94a3b8;
+  --ss-accent: #06b6d4;
+  --ss-accent-2: #6366f1;
+  --ss-btn-text: #020617;
+  --ss-shadow: 0 24px 70px -16px rgba(6, 182, 212, 0.22);
+  --ss-backdrop-blur: 20px;
+}
 
-  /* Custom sleek dark scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-  ::-webkit-scrollbar-track {
-    background: #020617;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #1e293b;
-    border-radius: 9999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #06b6d4;
-  }
+html[data-theme='dark'] {
+  --ss-bg: #09090b;
+  --ss-surface: rgba(20, 20, 25, 0.94);
+  --ss-surface-elevated: #141418;
+  --ss-surface-input: #09090b;
+  --ss-border: rgba(63, 63, 70, 0.85);
+  --ss-border-strong: rgba(56, 189, 248, 0.5);
+  --ss-text: #fafafa;
+  --ss-text-secondary: #d4d4d8;
+  --ss-text-muted: #a1a1aa;
+  --ss-accent: #38bdf8;
+  --ss-accent-2: #818cf8;
+  --ss-btn-text: #09090b;
+  --ss-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+  --ss-backdrop-blur: 8px;
+}
+
+html[data-theme='light'] {
+  --ss-bg: #f4f7fb;
+  --ss-surface: rgba(255, 255, 255, 0.88);
+  --ss-surface-elevated: #ffffff;
+  --ss-surface-input: #f1f5f9;
+  --ss-border: rgba(148, 163, 184, 0.38);
+  --ss-border-strong: rgba(2, 132, 199, 0.55);
+  --ss-text: #0f172a;
+  --ss-text-secondary: #334155;
+  --ss-text-muted: #64748b;
+  --ss-accent: #0284c7;
+  --ss-accent-2: #4f46e5;
+  --ss-btn-text: #ffffff;
+  --ss-shadow: 0 20px 50px -18px rgba(15, 23, 42, 0.12);
+  --ss-backdrop-blur: 16px;
+}
+
+html[data-theme='cyber'] {
+  --ss-bg: #050111;
+  --ss-surface: rgba(16, 6, 38, 0.72);
+  --ss-surface-elevated: rgba(11, 4, 28, 0.95);
+  --ss-surface-input: rgba(6, 2, 18, 0.88);
+  --ss-border: rgba(0, 245, 212, 0.36);
+  --ss-border-strong: rgba(247, 37, 133, 0.7);
+  --ss-text: #f0fdfa;
+  --ss-text-secondary: #e2e8f0;
+  --ss-text-muted: #94a3b8;
+  --ss-accent: #00f5d4;
+  --ss-accent-2: #f72585;
+  --ss-btn-text: #050111;
+  --ss-shadow: 0 0 42px rgba(0, 245, 212, 0.24), 0 0 80px rgba(247, 37, 133, 0.12);
+  --ss-backdrop-blur: 20px;
+}
+
+body {
+  background-color: var(--ss-bg);
+  color: var(--ss-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+.ss-glass-card {
+  background: var(--ss-surface) !important;
+  border-color: var(--ss-border) !important;
+  backdrop-filter: blur(var(--ss-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--ss-backdrop-blur));
+  box-shadow: var(--ss-shadow);
+}
+
+.ss-modal-surface {
+  background: var(--ss-surface-elevated) !important;
+  border-color: var(--ss-border) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--ss-shadow);
+}
+
+/* Automatic Light Mode High-Contrast Adaptation Across All Legacy Utility Classes */
+html[data-theme='light'] .text-white {
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] .text-slate-100,
+html[data-theme='light'] .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html[data-theme='light'] .text-slate-300,
+html[data-theme='light'] .text-slate-300\/90 {
+  color: #334155 !important;
+}
+
+html[data-theme='light'] .text-slate-400 {
+  color: #475569 !important;
+}
+
+html[data-theme='light'] .text-cyan-300,
+html[data-theme='light'] .text-cyan-200,
+html[data-theme='light'] .text-cyan-400 {
+  color: #0369a1 !important;
+}
+
+html[data-theme='light'] .bg-slate-950,
+html[data-theme='light'] .bg-slate-950\/95,
+html[data-theme='light'] .bg-slate-950\/90,
+html[data-theme='light'] .bg-slate-950\/85,
+html[data-theme='light'] .bg-slate-950\/80,
+html[data-theme='light'] .bg-slate-950\/75,
+html[data-theme='light'] .bg-slate-950\/60,
+html[data-theme='light'] .bg-slate-950\/40 {
+  background-color: rgba(248, 250, 252, 0.94) !important;
+}
+
+html[data-theme='light'] .bg-slate-900,
+html[data-theme='light'] .bg-slate-900\/95,
+html[data-theme='light'] .bg-slate-900\/90,
+html[data-theme='light'] .bg-slate-900\/80,
+html[data-theme='light'] .bg-slate-900\/75,
+html[data-theme='light'] .bg-slate-900\/70,
+html[data-theme='light'] .bg-slate-900\/65,
+html[data-theme='light'] .bg-slate-900\/60,
+html[data-theme='light'] .bg-slate-900\/55 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html[data-theme='light'] .border-slate-800,
+html[data-theme='light'] .border-slate-800\/90,
+html[data-theme='light'] .border-slate-800\/85,
+html[data-theme='light'] .border-slate-700,
+html[data-theme='light'] .border-slate-700\/80,
+html[data-theme='light'] .border-slate-700\/60,
+html[data-theme='light'] .border-white\/10,
+html[data-theme='light'] .border-white\/15,
+html[data-theme='light'] .border-white\/20 {
+  border-color: rgba(148, 163, 184, 0.42) !important;
+}
+
+/* Preserve bright text over solid gradient CTA buttons & dark image overlays in Light mode */
+html[data-theme='light'] .keep-white-text,
+html[data-theme='light'] .keep-white-text * {
+  color: #ffffff !important;
+}
+
+html[data-theme='light'] .keep-dark-text {
+  color: #020617 !important;
+}
+
+/* Cyber/Neon Surface & Neon Border Enhancements */
+html[data-theme='cyber'] .border-slate-800,
+html[data-theme='cyber'] .border-slate-700,
+html[data-theme='cyber'] .border-white\/10,
+html[data-theme='cyber'] .border-white\/15 {
+  border-color: rgba(0, 245, 212, 0.3) !important;
 }
 
 .no-scrollbar::-webkit-scrollbar {
