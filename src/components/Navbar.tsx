@@ -28,6 +28,7 @@ interface NavbarProps {
   themeMode: ThemeMode;
   viewMode: ViewLayoutMode;
   cartCount: number;
+  onNavigateSection?: (sectionId: string) => void;
   onChangeThemeMode: (mode: ThemeMode) => void;
   onToggleViewMode: (nextMode: ViewLayoutMode) => void;
   onOpenAuth: (tab?: 'login' | 'register') => void;
@@ -54,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   themeMode,
   viewMode,
   cartCount,
+  onNavigateSection,
   onChangeThemeMode,
   onToggleViewMode,
   onOpenAuth,
@@ -84,6 +86,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* SwiftStack Monogram & Brand */}
           <a
             href="#hero"
+            onClick={(e) => {
+              if (onNavigateSection) {
+                e.preventDefault();
+                onNavigateSection('hero');
+              }
+            }}
             className="focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-xl shrink-0"
           >
             <SwiftStackLogo
@@ -101,6 +109,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               <a
                 key={link.href}
                 href={link.href}
+                onClick={(e) => {
+                  if (onNavigateSection) {
+                    e.preventDefault();
+                    onNavigateSection(link.href.slice(1));
+                  }
+                }}
                 className="text-sm font-semibold text-slate-200 hover:text-cyan-300 transition-colors"
               >
                 {link.label}
@@ -377,7 +391,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <a
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={(e) => {
+                  setMobileMenuOpen(false);
+                  if (onNavigateSection) {
+                    e.preventDefault();
+                    onNavigateSection(link.href.slice(1));
+                  }
+                }}
                 className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/10 transition-colors"
               >
                 {link.label}

@@ -3,18 +3,19 @@
 @tailwind utilities;
 
 /* ============================================================================
-   SWIFTSTACK V5 — TRUE TRANSPARENT "SHEESHA" CRYSTAL GLASS ENGINE
-   Literal polished see-through crystal glass (backdrop-blur-2xl, diamond bevel
-   highlights, ultra-pure transparency, razor-sharp contrast & non-blinding shine)
+   SWIFTSTACK V6 — GPU-ACCELERATED PURE SHEESHA GLASS & THERMAL-COOL ENGINE
+   - Zero body background-attachment:fixed repaints (GPU-promoted fixed backdrop)
+   - Pixel-perfect centered Desktop & Mobile modes with zero horizontal overflow
+   - Smooth 60/120Hz inertial scrolling across iOS Safari, Android & Desktop
    ============================================================================ */
 
 :root,
 html[data-theme='glass'] {
-  --ss-bg-base: #050c1d;
+  --ss-bg-base: #040918;
   --ss-bg-grad: radial-gradient(
-      circle at 16% 16%,
+      circle at 18% 18%,
       rgba(14, 165, 233, 0.16) 0%,
-      transparent 44%
+      transparent 45%
     ),
     radial-gradient(
       circle at 82% 24%,
@@ -22,50 +23,54 @@ html[data-theme='glass'] {
       transparent 46%
     ),
     radial-gradient(ellipse at 50% 0%, #0b1c3d 0%, #061024 55%, #030814 100%);
-  /* LITERAL PURE TRANSPARENT SHEESHA FILL (ultra-clear see-through crystal glass!) */
   --ss-glass-fill: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.09) 0%,
-    rgba(255, 255, 255, 0.025) 50%,
-    rgba(56, 189, 248, 0.06) 100%
+    rgba(255, 255, 255, 0.028) 50%,
+    rgba(56, 189, 248, 0.062) 100%
   );
   --ss-glass-fill-hover: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.145) 0%,
-    rgba(255, 255, 255, 0.045) 50%,
+    rgba(255, 255, 255, 0.05) 50%,
     rgba(56, 189, 248, 0.11) 100%
   );
   --ss-glass-btn-fill: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.11) 0%,
-    rgba(255, 255, 255, 0.035) 100%
+    rgba(255, 255, 255, 0.038) 100%
   );
   --ss-modal-fill: linear-gradient(
     145deg,
-    rgba(10, 22, 48, 0.62) 0%,
-    rgba(5, 13, 30, 0.52) 100%
+    rgba(9, 20, 44, 0.88) 0%,
+    rgba(5, 12, 28, 0.84) 100%
   );
-  --ss-input-fill: rgba(255, 255, 255, 0.065);
-  --ss-border: rgba(255, 255, 255, 0.24);
+  --ss-admin-panel-fill: linear-gradient(
+    145deg,
+    rgba(10, 22, 48, 0.78) 0%,
+    rgba(6, 13, 30, 0.72) 100%
+  );
+  --ss-input-fill: rgba(15, 28, 56, 0.55);
+  --ss-border: rgba(255, 255, 255, 0.23);
   --ss-border-subtle: rgba(148, 163, 184, 0.16);
-  --ss-border-hover: rgba(103, 232, 249, 0.66);
+  --ss-border-hover: rgba(103, 232, 249, 0.68);
   --ss-text: #ffffff;
   --ss-text-secondary: #e2e8f0;
   --ss-text-muted: #94a3b8;
   --ss-accent: #38bdf8;
   --ss-accent-2: #818cf8;
-  --ss-shadow: 0 20px 50px -14px rgba(2, 6, 23, 0.55),
-    inset 0 1px 1px rgba(255, 255, 255, 0.45),
+  --ss-shadow: 0 18px 44px -14px rgba(2, 6, 23, 0.52),
+    inset 0 1px 1px rgba(255, 255, 255, 0.42),
     inset 0 -1px 1px rgba(56, 189, 248, 0.14);
-  --ss-shadow-hover: 0 26px 60px -12px rgba(6, 182, 212, 0.3),
-    0 0 24px -4px rgba(56, 189, 248, 0.22),
-    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.68),
-    inset 0 -1px 1px rgba(56, 189, 248, 0.26);
-  --ss-shine-color: rgba(255, 255, 255, 0.22);
+  --ss-shadow-hover: 0 24px 54px -12px rgba(6, 182, 212, 0.28),
+    0 0 22px -4px rgba(56, 189, 248, 0.22),
+    inset 0 1.5px 1.5px rgba(255, 255, 255, 0.65),
+    inset 0 -1px 1px rgba(56, 189, 248, 0.24);
+  --ss-shine-color: rgba(255, 255, 255, 0.2);
   --ss-word-glow-bg: linear-gradient(
     135deg,
-    rgba(6, 182, 212, 0.34),
-    rgba(59, 130, 246, 0.34)
+    rgba(6, 182, 212, 0.36),
+    rgba(59, 130, 246, 0.36)
   );
   --ss-word-glow-text: #67e8f9;
   --ss-word-glow-shadow: 0 0 22px rgba(34, 211, 238, 0.55);
@@ -76,42 +81,47 @@ html[data-theme='light'] {
   --ss-bg-grad: radial-gradient(circle at 18% 14%, #ffffff 0%, #eaf3fc 50%, #dceafb 100%);
   --ss-glass-fill: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.38) 0%,
-    rgba(255, 255, 255, 0.16) 100%
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.26) 100%
   );
   --ss-glass-fill-hover: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.54) 0%,
-    rgba(255, 255, 255, 0.26) 100%
+    rgba(255, 255, 255, 0.68) 0%,
+    rgba(255, 255, 255, 0.38) 100%
   );
   --ss-glass-btn-fill: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.48) 0%,
-    rgba(255, 255, 255, 0.22) 100%
+    rgba(255, 255, 255, 0.58) 0%,
+    rgba(255, 255, 255, 0.3) 100%
   );
   --ss-modal-fill: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.78) 0%,
-    rgba(241, 247, 255, 0.66) 100%
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(241, 247, 255, 0.88) 100%
   );
-  --ss-input-fill: rgba(255, 255, 255, 0.6);
-  --ss-border: rgba(255, 255, 255, 0.85);
-  --ss-border-subtle: rgba(148, 163, 184, 0.28);
+  --ss-admin-panel-fill: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(241, 247, 255, 0.78) 100%
+  );
+  --ss-input-fill: rgba(255, 255, 255, 0.72);
+  --ss-border: rgba(148, 163, 184, 0.35);
+  --ss-border-subtle: rgba(148, 163, 184, 0.26);
   --ss-border-hover: rgba(2, 132, 199, 0.55);
   --ss-text: #0b132b;
   --ss-text-secondary: #1e293b;
   --ss-text-muted: #475569;
   --ss-accent: #0284c7;
   --ss-accent-2: #4f46e5;
-  --ss-shadow: 0 18px 46px -14px rgba(15, 23, 42, 0.09),
+  --ss-shadow: 0 18px 44px -14px rgba(15, 23, 42, 0.09),
     inset 0 1.5px 1px rgba(255, 255, 255, 0.95);
-  --ss-shadow-hover: 0 24px 56px -12px rgba(2, 132, 199, 0.2),
+  --ss-shadow-hover: 0 24px 52px -12px rgba(2, 132, 199, 0.18),
     inset 0 1.5px 1.5px #ffffff;
   --ss-shine-color: rgba(255, 255, 255, 0.5);
   --ss-word-glow-bg: linear-gradient(
     135deg,
-    rgba(6, 182, 212, 0.22),
-    rgba(59, 130, 246, 0.22)
+    rgba(6, 182, 212, 0.24),
+    rgba(59, 130, 246, 0.24)
   );
   --ss-word-glow-text: #0369a1;
   --ss-word-glow-shadow: 0 0 18px rgba(6, 182, 212, 0.35);
@@ -122,25 +132,30 @@ html[data-theme='dark'] {
   --ss-bg-grad: radial-gradient(circle at 20% 15%, #0e1628 0%, #05080f 60%, #020408 100%);
   --ss-glass-fill: linear-gradient(
     135deg,
-    rgba(15, 23, 42, 0.44) 0%,
-    rgba(9, 14, 26, 0.26) 100%
+    rgba(15, 23, 42, 0.5) 0%,
+    rgba(9, 14, 26, 0.3) 100%
   );
   --ss-glass-fill-hover: linear-gradient(
     135deg,
-    rgba(22, 33, 58, 0.58) 0%,
-    rgba(12, 19, 36, 0.38) 100%
+    rgba(22, 33, 58, 0.62) 0%,
+    rgba(12, 19, 36, 0.42) 100%
   );
   --ss-glass-btn-fill: linear-gradient(
     135deg,
-    rgba(30, 41, 59, 0.48) 0%,
-    rgba(15, 23, 42, 0.3) 100%
+    rgba(30, 41, 59, 0.52) 0%,
+    rgba(15, 23, 42, 0.34) 100%
   );
   --ss-modal-fill: linear-gradient(
     145deg,
-    rgba(12, 19, 35, 0.84) 0%,
-    rgba(6, 10, 20, 0.78) 100%
+    rgba(12, 19, 35, 0.92) 0%,
+    rgba(6, 10, 20, 0.9) 100%
   );
-  --ss-input-fill: rgba(15, 23, 42, 0.55);
+  --ss-admin-panel-fill: linear-gradient(
+    145deg,
+    rgba(13, 21, 38, 0.85) 0%,
+    rgba(7, 12, 24, 0.8) 100%
+  );
+  --ss-input-fill: rgba(15, 23, 42, 0.65);
   --ss-border: rgba(148, 163, 184, 0.22);
   --ss-border-subtle: rgba(148, 163, 184, 0.14);
   --ss-border-hover: rgba(56, 189, 248, 0.58);
@@ -149,15 +164,15 @@ html[data-theme='dark'] {
   --ss-text-muted: #94a3b8;
   --ss-accent: #38bdf8;
   --ss-accent-2: #818cf8;
-  --ss-shadow: 0 22px 54px -16px rgba(0, 0, 0, 0.78),
+  --ss-shadow: 0 20px 50px -16px rgba(0, 0, 0, 0.78),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  --ss-shadow-hover: 0 26px 62px -12px rgba(56, 189, 248, 0.26),
+  --ss-shadow-hover: 0 26px 58px -12px rgba(56, 189, 248, 0.26),
     inset 0 1px 1px rgba(255, 255, 255, 0.3);
   --ss-shine-color: rgba(56, 189, 248, 0.16);
   --ss-word-glow-bg: linear-gradient(
     135deg,
-    rgba(6, 182, 212, 0.32),
-    rgba(59, 130, 246, 0.3)
+    rgba(6, 182, 212, 0.34),
+    rgba(59, 130, 246, 0.32)
   );
   --ss-word-glow-text: #67e8f9;
   --ss-word-glow-shadow: 0 0 22px rgba(34, 211, 238, 0.48);
@@ -168,25 +183,30 @@ html[data-theme='cyber'] {
   --ss-bg-grad: radial-gradient(circle at 22% 16%, #140834 0%, #050212 58%, #02010a 100%);
   --ss-glass-fill: linear-gradient(
     135deg,
-    rgba(20, 10, 48, 0.34) 0%,
-    rgba(0, 245, 212, 0.04) 100%
+    rgba(20, 10, 48, 0.42) 0%,
+    rgba(0, 245, 212, 0.05) 100%
   );
   --ss-glass-fill-hover: linear-gradient(
     135deg,
-    rgba(28, 14, 64, 0.48) 0%,
-    rgba(0, 245, 212, 0.09) 100%
+    rgba(28, 14, 64, 0.55) 0%,
+    rgba(0, 245, 212, 0.1) 100%
   );
   --ss-glass-btn-fill: linear-gradient(
     135deg,
-    rgba(26, 12, 58, 0.44) 0%,
-    rgba(0, 245, 212, 0.06) 100%
+    rgba(26, 12, 58, 0.48) 0%,
+    rgba(0, 245, 212, 0.07) 100%
   );
   --ss-modal-fill: linear-gradient(
     145deg,
-    rgba(14, 6, 34, 0.84) 0%,
-    rgba(7, 3, 20, 0.78) 100%
+    rgba(14, 6, 34, 0.92) 0%,
+    rgba(7, 3, 20, 0.9) 100%
   );
-  --ss-input-fill: rgba(12, 5, 28, 0.62);
+  --ss-admin-panel-fill: linear-gradient(
+    145deg,
+    rgba(16, 7, 38, 0.84) 0%,
+    rgba(8, 3, 22, 0.8) 100%
+  );
+  --ss-input-fill: rgba(12, 5, 28, 0.68);
   --ss-border: rgba(0, 245, 212, 0.34);
   --ss-border-subtle: rgba(0, 245, 212, 0.2);
   --ss-border-hover: rgba(0, 245, 212, 0.75);
@@ -195,9 +215,9 @@ html[data-theme='cyber'] {
   --ss-text-muted: #94a3b8;
   --ss-accent: #00f5d4;
   --ss-accent-2: #f72585;
-  --ss-shadow: 0 22px 54px -16px rgba(0, 245, 212, 0.2),
+  --ss-shadow: 0 20px 50px -16px rgba(0, 245, 212, 0.2),
     inset 0 1px 1px rgba(0, 245, 212, 0.28);
-  --ss-shadow-hover: 0 26px 64px -12px rgba(0, 245, 212, 0.35),
+  --ss-shadow-hover: 0 26px 60px -12px rgba(0, 245, 212, 0.35),
     inset 0 1px 1.5px rgba(255, 255, 255, 0.45);
   --ss-shine-color: rgba(0, 245, 212, 0.18);
   --ss-word-glow-bg: linear-gradient(
@@ -209,17 +229,38 @@ html[data-theme='cyber'] {
   --ss-word-glow-shadow: 0 0 24px rgba(0, 245, 212, 0.55);
 }
 
+/* Buttery-smooth inertial scrolling & zero horizontal overflow */
 html {
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overflow-x: clip;
+  width: 100%;
+  background-color: var(--ss-bg-base);
 }
 
 body {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow-x: clip;
   background-color: var(--ss-bg-base);
-  background-image: var(--ss-bg-grad);
-  background-attachment: fixed;
   color: var(--ss-text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  transition: background-color 0.35s ease, color 0.35s ease;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Dedicated GPU-composited backdrop layer — NEVER repaints on scroll! */
+.ss-gpu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--ss-bg-base);
+  background-image: var(--ss-bg-grad);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .font-display {
@@ -227,16 +268,19 @@ body {
 }
 
 /* ============================================================================
-   DYNAMIC DESKTOP VIEW VS MOBILE VIEW LAYOUT ENGINE
-   Works seamlessly on BOTH mobile phones AND desktop monitors!
+   PIXEL-PERFECT DESKTOP MODE & MOBILE MODE SCALING (ZERO CLIPPING / DISTORTION)
    ============================================================================ */
 
-html[data-view-mode='desktop'] body {
-  min-width: 1220px;
+html[data-view-mode='desktop'] .ss-viewport-shell {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 html[data-view-mode='mobile'] .ss-viewport-shell {
-  max-width: 440px;
+  width: 100%;
+  max-width: 460px;
   margin-left: auto;
   margin-right: auto;
   border-left: 1px solid var(--ss-border-subtle);
@@ -245,7 +289,7 @@ html[data-view-mode='mobile'] .ss-viewport-shell {
 }
 
 html[data-view-mode='mobile'] header.ss-top-header {
-  max-width: 440px;
+  max-width: 460px;
   margin-left: auto;
   margin-right: auto;
   padding-left: 0.75rem;
@@ -269,7 +313,7 @@ html[data-view-mode='mobile'] .ss-hero-col {
 }
 
 /* ============================================================================
-   LITERAL POLISHED "SHEESHA" GLASS CONTAINERS & DYNAMIC POP/SHINE HOVERS
+   PURE POLISHED SHEESHA GLASS CONTAINERS (GPU-ACCELERATED, THERMAL-COOL)
    ============================================================================ */
 
 .ss-glass-card {
@@ -277,25 +321,33 @@ html[data-view-mode='mobile'] .ss-hero-col {
   overflow: hidden;
   background: var(--ss-glass-fill) !important;
   border: 1px solid var(--ss-border) !important;
-  backdrop-filter: blur(28px) saturate(185%);
-  -webkit-backdrop-filter: blur(28px) saturate(185%);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
   box-shadow: var(--ss-shadow);
+  transform: translateZ(0);
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.28s ease,
-    background 0.28s ease;
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease,
+    background 0.24s ease;
 }
 
-/* Specular crystal reflection sweeping smoothly behind text */
-.ss-glass-card::before,
+@media (max-width: 768px) {
+  .ss-glass-card {
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+  }
+}
+
+/* Lightweight GPU- friendly specular glass reflection inside cards */
+.ss-glass-interactive::before,
 .ss-glass-btn::before,
 .ss-cta-btn::before {
   content: '';
   position: absolute;
   top: -25%;
-  left: -140%;
-  width: 68%;
+  left: -135%;
+  width: 65%;
   height: 150%;
   background: linear-gradient(
     110deg,
@@ -303,16 +355,16 @@ html[data-view-mode='mobile'] .ss-hero-col {
     var(--ss-shine-color) 50%,
     transparent 100%
   );
-  transform: skewX(-24deg);
+  transform: skewX(-24deg) translateZ(0);
   pointer-events: none;
   z-index: 0;
-  transition: left 0.82s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.ss-glass-card:hover::before,
+.ss-glass-interactive:hover::before,
 .ss-glass-btn:hover::before,
 .ss-cta-btn:hover::before {
-  left: 180%;
+  transform: translateX(480%) skewX(-24deg) translateZ(0);
 }
 
 .ss-glass-card > *,
@@ -323,10 +375,17 @@ html[data-view-mode='mobile'] .ss-hero-col {
 }
 
 .ss-glass-interactive:hover {
-  transform: translateY(-4px) scale(1.008);
+  transform: translate3d(0, -4px, 0) scale(1.006);
   background: var(--ss-glass-fill-hover) !important;
   border-color: var(--ss-border-hover) !important;
   box-shadow: var(--ss-shadow-hover);
+}
+
+/* GPU-safe solid-translucent card inside full-page Owner Dashboard (0 GPU overload!) */
+.ss-admin-card {
+  background: var(--ss-admin-panel-fill) !important;
+  border: 1px solid var(--ss-border) !important;
+  box-shadow: var(--ss-shadow);
 }
 
 .ss-glass-btn {
@@ -334,19 +393,20 @@ html[data-view-mode='mobile'] .ss-hero-col {
   overflow: hidden;
   background: var(--ss-glass-btn-fill) !important;
   border: 1px solid var(--ss-border) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
   color: var(--ss-text) !important;
   box-shadow: var(--ss-shadow);
+  transform: translateZ(0);
   transition:
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease,
-    border-color 0.25s ease,
-    background 0.25s ease;
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease;
 }
 
 .ss-glass-btn:hover {
-  transform: translateY(-2px) scale(1.02);
+  transform: translate3d(0, -2px, 0) scale(1.02);
   background: var(--ss-glass-fill-hover) !important;
   border-color: var(--ss-border-hover) !important;
   box-shadow: var(--ss-shadow-hover);
@@ -355,22 +415,23 @@ html[data-view-mode='mobile'] .ss-hero-col {
 .ss-cta-btn {
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
   transition:
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease,
-    filter 0.25s ease;
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    filter 0.22s ease;
 }
 
 .ss-cta-btn:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 16px 38px -8px rgba(6, 182, 212, 0.5);
+  transform: translate3d(0, -2px, 0) scale(1.02);
+  box-shadow: 0 16px 36px -8px rgba(6, 182, 212, 0.5);
 }
 
 .ss-modal-surface {
   background: var(--ss-modal-fill) !important;
   border: 1px solid var(--ss-border) !important;
-  backdrop-filter: blur(32px) saturate(190%);
-  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
   box-shadow: var(--ss-shadow-hover);
 }
 
@@ -378,8 +439,6 @@ html[data-view-mode='mobile'] .ss-hero-col {
   background: var(--ss-input-fill) !important;
   border: 1px solid var(--ss-border) !important;
   color: var(--ss-text) !important;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -395,12 +454,12 @@ html[data-theme='light'] .ss-glass-input option {
 
 .ss-glass-input::placeholder {
   color: var(--ss-text-muted) !important;
-  opacity: 0.8;
+  opacity: 0.82;
 }
 
 .ss-glass-input:focus {
   border-color: var(--ss-accent) !important;
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
   outline: none;
 }
 

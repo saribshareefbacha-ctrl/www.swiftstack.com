@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAnalytics, Analytics } from 'firebase/analytics';
+import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -14,19 +14,21 @@ export const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const firebaseApp = app;
 
 export let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
-  try {
-    analytics = getAnalytics(app);
-  } catch {
-    analytics = null;
-  }
+  isSupported()
+    .then((yes) => {
+      if (yes) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch(() => {
+      // Safe fallback in restricted/ad-blocked browser contexts
+    });
 }
 
 export const firebaseAuth = getAuth(app);
 export const googleAuthProvider = new GoogleAuthProvider();
 googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
-
 export const firestoreDb = getFirestore(app);

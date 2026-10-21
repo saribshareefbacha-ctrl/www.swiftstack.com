@@ -18,11 +18,40 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function () {
+        try {
+          var savedTheme = localStorage.getItem('swiftstack_theme_mode_v5');
+          if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+          }
+          var mode =
+            localStorage.getItem('swiftstack_view_mode_v6') ||
+            localStorage.getItem('swiftstack_view_mode_v5');
+          if (mode === 'desktop' || mode === 'mobile') {
+            document.documentElement.setAttribute('data-view-mode', mode);
+            var meta = document.getElementById('dynamic-viewport-meta');
+            var sw = window.screen && window.screen.width ? window.screen.width : window.innerWidth;
+            if (meta && mode === 'desktop' && sw > 0 && sw < 1024) {
+              var s = Math.max(0.24, Math.min(1, Number((sw / 1280).toFixed(4))));
+              meta.setAttribute(
+                'content',
+                'width=1280, initial-scale=' +
+                  s +
+                  ', minimum-scale=' +
+                  s +
+                  ', maximum-scale=3.0, user-scalable=yes'
+              );
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>SwiftStack (SS) — Digital Engineering &amp; AI Studio | Muhammad Sarib Randhawa</title>
-    <script type="module" crossorigin src="./assets/app-BEWxuCw6.js"></script>
+    <script type="module" crossorigin src="./assets/app-Bpib0ezK.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/react-vendor-C3p3rqLv.js">
-    <link rel="modulepreload" crossorigin href="./assets/firebase-vendor-DfQK2mya.js">
-    <link rel="stylesheet" crossorigin href="./assets/app-HlepYOzR.css">
+    <link rel="modulepreload" crossorigin href="./assets/firebase-vendor-CiAuvzoi.js">
+    <link rel="stylesheet" crossorigin href="./assets/app-qxDAAJL3.css">
   </head>
   <body>
     <div id="root"></div>

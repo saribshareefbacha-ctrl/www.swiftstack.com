@@ -89,7 +89,7 @@ app.use(attachUser);
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    platform: 'SwiftStack (SS) Agency & Shopping Platform V5',
+    platform: 'SwiftStack (SS) Agency & Shopping Platform V6',
     owner: 'Muhammad Sarib Randhawa',
     ownerEmails: AUTHORIZED_OWNER_EMAILS,
     timestamp: new Date().toISOString(),
@@ -243,6 +243,8 @@ app.put('/api/cms/sync', (req, res) => {
   const merged = saveCMSData({
     branding: { ...current.branding, ...(body.branding || {}) },
     hero: { ...current.hero, ...(body.hero || {}) },
+    metrics: Array.isArray(body.metrics) ? body.metrics : current.metrics,
+    socialLinks: Array.isArray(body.socialLinks) ? body.socialLinks : current.socialLinks,
     voice: { ...current.voice, ...(body.voice || {}) },
     theme: { ...current.theme, ...(body.theme || {}) },
     services: Array.isArray(body.services) ? body.services : current.services,
@@ -264,6 +266,24 @@ app.put('/api/cms/hero', (req, res) => {
   cms.hero = { ...cms.hero, ...req.body };
   saveCMSData(cms);
   res.json({ hero: cms.hero });
+});
+
+app.put('/api/cms/metrics', (req, res) => {
+  const cms = getCMSData();
+  if (Array.isArray(req.body?.metrics)) {
+    cms.metrics = req.body.metrics;
+  }
+  saveCMSData(cms);
+  res.json({ metrics: cms.metrics });
+});
+
+app.put('/api/cms/social', (req, res) => {
+  const cms = getCMSData();
+  if (Array.isArray(req.body?.socialLinks)) {
+    cms.socialLinks = req.body.socialLinks;
+  }
+  saveCMSData(cms);
+  res.json({ socialLinks: cms.socialLinks });
 });
 
 app.put('/api/cms/voice', (req, res) => {
@@ -500,7 +520,7 @@ async function startServer() {
 
   app.listen(port, host, () => {
     console.log(
-      `[SwiftStack V5] Live platform running on http://${host}:${port} (Pure Sheesha Glass Edition)`
+      `[SwiftStack V6] Live platform running on http://${host}:${port} (Pure Sheesha Glass Edition)`
     );
   });
 }

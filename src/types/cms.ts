@@ -4,6 +4,50 @@ export type ViewLayoutMode = 'desktop' | 'mobile';
 
 export type VoiceGender = 'male' | 'female';
 
+export type SocialPlatformType =
+  | 'whatsapp'
+  | 'telegram'
+  | 'facebook'
+  | 'instagram'
+  | 'linkedin'
+  | 'youtube'
+  | 'x'
+  | 'custom';
+
+export type CustomSocialIconName =
+  | 'MessageCircle'
+  | 'Send'
+  | 'Globe'
+  | 'Mail'
+  | 'Phone'
+  | 'Github'
+  | 'Briefcase'
+  | 'ExternalLink'
+  | 'Sparkles'
+  | 'Video';
+
+export interface SocialLinkItem {
+  id: string;
+  platform: SocialPlatformType;
+  label: string;
+  handleOrTagline: string;
+  url: string;
+  enabled: boolean;
+  isOfficial: boolean;
+  customIconName?: CustomSocialIconName;
+  customIconUrl?: string;
+  accentColor?: string;
+}
+
+export interface RealTimeMetricItem {
+  id: string;
+  value: string;
+  label: string;
+  liveAutoIncrement?: 'none' | 'projects_plus_orders' | 'orders_count';
+  baseNumber?: number;
+  suffix?: string;
+}
+
 export interface SiteBrandingMeta {
   companyName: string;
   monogram: string;
@@ -25,12 +69,6 @@ export interface HeroCMS {
   introSpeechText: string;
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
-  stat1Value: string;
-  stat1Label: string;
-  stat2Value: string;
-  stat2Label: string;
-  stat3Value: string;
-  stat3Label: string;
 }
 
 export interface VoiceEngineConfig {
@@ -85,6 +123,7 @@ export interface SubAdminPermissions {
   canManageProjects: boolean;
   canManageTheme: boolean;
   canManageOrders: boolean;
+  canManageSocial: boolean;
 }
 
 export interface SubAdminAccount {
@@ -101,6 +140,8 @@ export interface SubAdminAccount {
 export interface SiteCMSData {
   branding: SiteBrandingMeta;
   hero: HeroCMS;
+  metrics: RealTimeMetricItem[];
+  socialLinks: SocialLinkItem[];
   voice: VoiceEngineConfig;
   theme: ThemeCMS;
   services: ServiceItem[];
@@ -150,3 +191,5 @@ export interface UserProfile {
   permissions?: SubAdminPermissions;
   createdAt: string;
 }
+
+export type AppPageView = 'home' | 'owner-dashboard';
