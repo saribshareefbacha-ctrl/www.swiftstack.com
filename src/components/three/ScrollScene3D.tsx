@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { ThemeMode } from '../../types/cms';
 
 interface ScrollScene3DProps {
+  themeMode: ThemeMode;
   primaryHex: string;
   secondaryHex: string;
   accentHex: string;
@@ -11,6 +13,7 @@ interface ScrollScene3DProps {
 }
 
 export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
+  themeMode,
   primaryHex,
   secondaryHex,
   accentHex,
@@ -25,7 +28,6 @@ export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
     if (!container) return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x050b1a, 0.042);
 
     const camera = new THREE.PerspectiveCamera(
       52,
@@ -44,11 +46,20 @@ export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    const primaryColor = new THREE.Color(primaryHex || '#06b6d4');
-    const secondaryColor = new THREE.Color(secondaryHex || '#6366f1');
-    const accentColor = new THREE.Color(accentHex || '#22d3ee');
+    const isLight = themeMode === 'light';
+    const isCyber = themeMode === 'cyber';
 
-    const count = Math.max(80, Math.min(280, particleDensity || 160));
+    const primaryColor = new THREE.Color(
+      isCyber ? '#00f5d4' : isLight ? '#0284c7' : primaryHex || '#06b6d4'
+    );
+    const secondaryColor = new THREE.Color(
+      isCyber ? '#f72585' : isLight ? '#4f46e5' : secondaryHex || '#6366f1'
+    );
+    const accentColor = new THREE.Color(
+      isCyber ? '#7209b7' : isLight ? '#0ea5e9' : accentHex || '#22d3ee'
+    );
+
+    const count = Math.max(80, Math.min(280, particleDensity || 150));
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
 
@@ -71,17 +82,16 @@ export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
     starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const starMaterial = new THREE.PointsMaterial({
-      size: 0.055,
+      size: isLight ? 0.065 : 0.058,
       vertexColors: true,
       transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
+      opacity: isLight ? 0.34 : isCyber ? 0.82 : 0.62,
+      blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
 
     const starField = new THREE.Points(starGeometry, starMaterial);
     scene.add(starField);
 
-    // Subtle background architectural grid mesh far behind content (no floating character stages)
     const archGroup = new THREE.Group();
     archGroup.position.set(0, -3.6, -6);
 
@@ -91,7 +101,11 @@ export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
       color: primaryColor,
       wireframe: true,
       transparent: true,
-      opacity: Math.max(0.03, Math.min(0.22, (wireframeOpacity || 0.2) * 0.45)),
+      opacity: isLight
+        ? 0.06
+        : isCyber
+          ? 0.16
+          : Math.max(0.03, Math.min(0.2, (wireframeOpacity || 0.18) * 0.45)),
     });
     const gridMesh = new THREE.Mesh(gridGeo, gridMat);
     archGroup.add(gridMesh);
@@ -142,7 +156,7 @@ export const ScrollScene3D: React.FC<ScrollScene3DProps> = ({
       gridMat.dispose();
       renderer.dispose();
     };
-  }, [primaryHex, secondaryHex, accentHex, particleDensity, scrollSpeed, wireframeOpacity]);
+  }, [themeMode, primaryHex, secondaryHex, accentHex, particleDensity, scrollSpeed, wireframeOpacity]);
 
   return (
     <div

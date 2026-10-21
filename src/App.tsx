@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from './data/defaultSeed';
-import { InquiryItem, SiteCMSData, UserProfile } from './types/cms';
-import { api } from './utils/api';
+import { InquiryItem, SiteCMSData, ThemeMode, UserProfile } from './types/cms';
+import { api, getSavedThemeMode, saveThemeMode } from './utils/api';
+import { syncDocumentBranding } from './utils/branding';
 import { ScrollScene3D } from './components/three/ScrollScene3D';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -16,16 +17,32 @@ export function App() {
   const [cmsData, setCmsData] = useState<SiteCMSData>(DEFAULT_CMS_DATA);
   const [orders, setOrders] = useState<InquiryItem[]>(INITIAL_SAMPLE_INQUIRIES);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(
+    () => getSavedThemeMode() || DEFAULT_CMS_DATA.theme.defaultMode || 'glass'
+  );
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [clientPortalOpen, setClientPortalOpen] = useState(false);
   const [ownerStudioOpen, setOwnerStudioOpen] = useState(false);
-  const [ownerStudioTab, setOwnerStudioTab] = useState<AdminTab>('hero');
+  const [ownerStudioTab, setOwnerStudioTab] = useState<AdminTab>('branding');
   const [selectedServiceForQuote, setSelectedServiceForQuote] = useState('');
 
-  // Real-time Firebase Cloud Subscriptions (CMS + Orders + Auth)
+  // Apply theme mode to <html> attribute
+  useEffect(() => {
+    saveThemeMode(themeMode);
+  }, [themeMode]);
+
+  // Real-time synchronize document <title>, <meta name="description"> & glowing Favicon
+  useEffect(() => {
+    syncDocumentBranding(cmsData.branding, cmsData.theme);
+  }, [cmsData.branding, cmsData.theme]);
+
+  // Real-time Firebase Cloud Subscriptions (CMS + Orders + Persisted Auth)
   useEffect(() => {
     const unsubCMS = api.subscribeCMS((liveCMS) => {
       setCmsData(liveCMS);
+      if (!getSavedThemeMode() && liveCMS.theme?.defaultMode) {
+        setThemeMode(liveCMS.theme.defaultMode);
+      }
     });
     const unsubOrders = api.subscribeOrders((liveOrders) => {
       setOrders(liveOrders);
@@ -42,7 +59,7 @@ export function App() {
   }, []);
 
   const activeClientOrdersCount = useMemo(() => {
-    if (!currentUser || currentUser.role === 'owner') return 0;
+    if (!currentUser || currentUser.role !== 'client') return 0;
     const emailClean = (currentUser.email || '').toLowerCase();
     return orders.filter(
       (o) =>
@@ -59,7 +76,9 @@ export function App() {
   const handleAuthenticated = (user: UserProfile) => {
     setCurrentUser(user);
     if (user.role === 'owner') {
-      openOwnerTab('hero');
+      openOwnerTab('branding');
+    } else if (user.role === 'subadmin') {
+      openOwnerTab('services');
     } else {
       setClientPortalOpen(true);
     }
@@ -83,14 +102,13 @@ export function App() {
   };
 
   const isOwner = currentUser?.role === 'owner';
+  const isStaff = isOwner || currentUser?.role === 'subadmin';
 
   return (
-    <div
-      className="relative min-h-screen overflow-x-clip text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-100"
-      style={{ backgroundColor: cmsData.theme.backgroundHex }}
-    >
-      {/* Clean Background Architectural Atmosphere (Zero Floating Avatar Stages) */}
+    <div className="relative min-h-screen overflow-x-clip selection:bg-cyan-500/30">
+      {/* Multi-Theme Reactive 3D Ambient Background */}
       <ScrollScene3D
+        themeMode={themeMode}
         primaryHex={cmsData.theme.primaryAccent}
         secondaryHex={cmsData.theme.secondaryAccent}
         accentHex={cmsData.theme.tertiaryAccent}
@@ -99,19 +117,24 @@ export function App() {
         wireframeOpacity={cmsData.theme.wireframeOpacity}
       />
 
-      {/* Sleek Conversion Navbar */}
+      {/* Sleek Conversion Navbar with Glowing Profile Badge & 4-Mode Theme Switcher */}
       <Navbar
         primaryColor={cmsData.theme.primaryAccent}
         secondaryColor={cmsData.theme.secondaryAccent}
+        companyName={cmsData.hero.companyName}
+        monogram={cmsData.branding.faviconMonogram || cmsData.hero.companyAbbreviation}
+        profileIconUrl={cmsData.branding.profileIconUrl}
+        themeMode={themeMode}
+        onChangeThemeMode={setThemeMode}
         currentUser={currentUser}
         activeOrdersCount={activeClientOrdersCount}
         onOpenAuth={() => setAuthModalOpen(true)}
         onOpenPortal={() => setClientPortalOpen(true)}
-        onOpenOwnerStudio={() => openOwnerTab('hero')}
+        onOpenOwnerStudio={() => openOwnerTab(isOwner ? 'branding' : 'services')}
         onLogout={handleLogout}
       />
 
-      {/* Main Content Flow: Hero (Single Executive CEO Character) -> Services -> Projects -> Order */}
+      {/* Main Content Flow */}
       <main className="relative z-10">
         <HeroSection
           hero={cmsData.hero}
@@ -130,7 +153,7 @@ export function App() {
           headingPrefix={cmsData.hero.servicesHeadingPrefix}
           headingHighlight={cmsData.hero.servicesHeadingHighlight}
           subheading={cmsData.hero.servicesSubheading}
-          isOwner={isOwner}
+          isOwner={isStaff}
           onSelectServiceForQuote={handleSelectServiceForOrder}
           onManageServices={() => openOwnerTab('services')}
         />
@@ -141,7 +164,7 @@ export function App() {
           headingPrefix={cmsData.hero.projectsHeadingPrefix}
           headingHighlight={cmsData.hero.projectsHeadingHighlight}
           subheading={cmsData.hero.projectsSubheading}
-          isOwner={isOwner}
+          isOwner={isStaff}
           onManageProjects={() => openOwnerTab('projects')}
           onStartSimilarProject={(projectTitle) =>
             handleSelectServiceForOrder(`Similar to: ${projectTitle}`)
@@ -157,16 +180,19 @@ export function App() {
         />
       </main>
 
-      {/* Unified Sign-In Modal (Firebase Google Login + Email Auth + Hidden 'admin' / 'admin') */}
+      {/* Unified Sign-In Modal (Google OAuth + Remember Me + Eye Toggles + Multi-Role Elevation) */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthenticated={handleAuthenticated}
         primaryColor={cmsData.theme.primaryAccent}
         secondaryColor={cmsData.theme.secondaryAccent}
+        companyName={cmsData.hero.companyName}
+        monogram={cmsData.branding.faviconMonogram || cmsData.hero.companyAbbreviation}
+        profileIconUrl={cmsData.branding.profileIconUrl}
       />
 
-      {/* Client Workspace Portal (Strictly Services, Projects & Live Order Tracking) */}
+      {/* Sleek Client Portal */}
       {currentUser && currentUser.role === 'client' && (
         <ClientPortalModal
           isOpen={clientPortalOpen}
@@ -180,15 +206,17 @@ export function App() {
         />
       )}
 
-      {/* Owner Real-Time CMS Dashboard (Unlocked Exclusively by Hidden 'admin' / 'admin') */}
-      {isOwner && (
+      {/* Multi-Tier Master Owner & Restricted Sub-Admin CMS Dashboard */}
+      {currentUser && isStaff && (
         <AdminCustomizationPanel
           isOpen={ownerStudioOpen}
           initialTab={ownerStudioTab}
+          currentUser={currentUser}
           onClose={() => setOwnerStudioOpen(false)}
           cmsData={cmsData}
           orders={orders}
           onCMSUpdated={setCmsData}
+          onChangeThemeMode={setThemeMode}
         />
       )}
     </div>

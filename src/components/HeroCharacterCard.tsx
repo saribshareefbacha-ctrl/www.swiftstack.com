@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Volume2, VolumeX, CheckCircle2, Edit3 } from 'lucide-react';
-import { CHARACTER_PRESET_IMAGES } from '../data/defaultSeed';
+import { CHARACTER_PRESET_FRAMES } from '../data/defaultSeed';
 import { CharacterConfig } from '../types/cms';
+
+export type VisemePhase = 'idle' | 'open' | 'wave';
 
 interface HeroCharacterCardProps {
   character: CharacterConfig;
@@ -10,6 +12,8 @@ interface HeroCharacterCardProps {
   founderTitle: string;
   voiceGreeting: string;
   isSpeaking: boolean;
+  visemePhase: VisemePhase;
+  activeWordIndex: number;
   isOwner?: boolean;
   onToggleSpeak: () => void;
   onEditCharacter?: () => void;
@@ -21,6 +25,8 @@ export const HeroCharacterCard: React.FC<HeroCharacterCardProps> = ({
   founderTitle,
   voiceGreeting,
   isSpeaking,
+  visemePhase,
+  activeWordIndex,
   isOwner = false,
   onToggleSpeak,
   onEditCharacter,
@@ -30,11 +36,11 @@ export const HeroCharacterCard: React.FC<HeroCharacterCardProps> = ({
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [7, -7]), {
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [6, -6]), {
     stiffness: 200,
     damping: 24,
   });
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), {
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-7, 7]), {
     stiffness: 200,
     damping: 24,
   });
@@ -53,115 +59,154 @@ export const HeroCharacterCard: React.FC<HeroCharacterCardProps> = ({
     mouseY.set(0);
   };
 
-  const characterImgSrc =
-    character.customImageUrl && character.customImageUrl.trim().length > 0
-      ? character.customImageUrl
-      : CHARACTER_PRESET_IMAGES[character.presetStyle] || CHARACTER_PRESET_IMAGES['executive-polo'];
+  const frames =
+    CHARACTER_PRESET_FRAMES[character.presetStyle] || CHARACTER_PRESET_FRAMES['executive-polo'];
+  const hasCustomImg = Boolean(character.customImageUrl && character.customImageUrl.trim().length > 0);
 
   const auraHex = character.auraColor || '#06b6d4';
 
-  const idleMotion =
-    character.gestureAnimation === 'dynamic'
+  const words = useMemo(() => {
+    return voiceGreeting.trim().split(/\s+/).filter(Boolean);
+  }, [voiceGreeting]);
+
+  // Synchronized body & gesture rhythm during speech vs idle
+  const figureMotion = isSpeaking
+    ? {
+        y: [0, -7, -2, -8, 0],
+        rotate: [0, 0.9, -0.8, 0.6, 0],
+        scale: [1, 1.022, 1.008, 1.025, 1],
+      }
+    : character.gestureAnimation === 'dynamic'
       ? {
-          y: [0, -10, 0],
-          rotate: [0, 1.1, -0.9, 0],
-          scale: isSpeaking ? [1, 1.03, 1.01, 1.035, 1] : [1, 1.015, 1],
+          y: [0, -9, 0],
+          rotate: [0, 0.8, -0.8, 0],
+          scale: [1, 1.012, 1],
         }
       : character.gestureAnimation === 'still'
         ? {
             y: [0, -2, 0],
-            scale: isSpeaking ? [1, 1.02, 1] : 1,
+            scale: 1,
           }
         : {
             y: [0, -6, 0],
-            rotate: [0, 0.55, -0.55, 0],
-            scale: isSpeaking ? [1, 1.028, 1.008, 1.028, 1] : [1, 1.01, 1],
+            rotate: [0, 0.45, -0.45, 0],
+            scale: [1, 1.008, 1],
           };
 
+  const showWaveFrame = !hasCustomImg && isSpeaking && visemePhase === 'wave' && Boolean(frames.wave);
+  const showOpenFrame = !hasCustomImg && isSpeaking && visemePhase === 'open' && !showWaveFrame;
+
   return (
-    <div
-      style={{ perspective: 1100 }}
-      className="relative mx-auto w-full max-w-[445px] select-none"
-    >
+    <div style={{ perspective: 1100 }} className="relative mx-auto w-full max-w-[455px] select-none">
+      {/* Seamless Transparent Frosted Glass Card — Zero Solid Black Container */}
       <motion.div
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
-        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        initial={{ opacity: 0, y: 22, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.65, ease: 'easeOut' }}
-        className="group relative overflow-hidden rounded-[2rem] border border-slate-700/65 bg-gradient-to-b from-slate-900/90 via-[#070f23]/95 to-[#050b1a] shadow-[0_28px_80px_-18px_rgba(6,182,212,0.3)] backdrop-blur-2xl"
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="ss-glass-card group relative overflow-hidden rounded-[2.25rem] border transition-all duration-300"
       >
-        {/* Subtle studio radial backlight */}
+        {/* Ambient Soft Radial Glow (Pure Light Halo — Transparent Backdrop) */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-500"
+          className="pointer-events-none absolute top-6 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-500"
           style={{
             background: `radial-gradient(circle, ${auraHex}42 0%, transparent 72%)`,
-            opacity: isSpeaking ? 0.95 : 0.65,
+            opacity: isSpeaking ? 0.95 : 0.58,
           }}
         />
 
-        {/* Top executive badge + strict owner-only edit shortcut */}
-        <div className="relative z-20 flex items-center justify-between px-5 pt-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/75 bg-slate-950/75 px-3 py-1 text-[11px] font-medium text-slate-200 backdrop-blur-md">
+        {/* Top Floating Status Pill + Strictly Owner-Only Quick Edit */}
+        <div className="relative z-20 flex items-center justify-between px-6 pt-5">
+          <div className="ss-glass-card inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-[11px] font-semibold">
             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-            <span>{character.greetingBadgeText || 'Founder & CEO'}</span>
+            <span className="text-slate-200">{character.greetingBadgeText || 'Founder & CEO'}</span>
           </div>
 
           {isOwner && onEditCharacter && (
             <button
               type="button"
               onClick={onEditCharacter}
-              className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/50 bg-cyan-500/15 px-3 py-1 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/25 transition"
+              className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/50 bg-cyan-500/15 px-3 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/25 transition"
             >
               <Edit3 className="h-3 w-3" />
-              <span>Customize CEO</span>
+              <span>Customize</span>
             </button>
           )}
         </div>
 
-        {/* Single Clean Executive CEO 3D Portrait Viewport */}
-        <div className="relative z-10 mx-auto flex h-[345px] sm:h-[380px] w-full items-end justify-center overflow-hidden px-4 pt-2">
-          {/* Speaking pulse wave ring behind character */}
+        {/* Pure Transparent 3D CEO Character Viewport (Zero Dark Box) */}
+        <div className="relative z-10 mx-auto flex h-[345px] sm:h-[385px] w-full items-end justify-center overflow-hidden bg-transparent px-4 pt-1">
+          {/* Live Soundwave Halo Behind Shoulders When Speaking */}
           {isSpeaking && (
             <motion.div
-              initial={{ scale: 0.85, opacity: 0.6 }}
-              animate={{ scale: [0.9, 1.18, 0.95], opacity: [0.45, 0.85, 0.45] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-              className="pointer-events-none absolute top-14 h-56 w-56 rounded-full border border-cyan-400/40"
-              style={{
-                boxShadow: `0 0 60px ${auraHex}35`,
-              }}
+              initial={{ scale: 0.86, opacity: 0.45 }}
+              animate={{ scale: [0.9, 1.16, 0.92], opacity: [0.35, 0.8, 0.35] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="pointer-events-none absolute top-14 h-56 w-56 rounded-full border-2 border-cyan-400/45"
+              style={{ boxShadow: `0 0 65px ${auraHex}40` }}
             />
           )}
 
-          {/* Animated 3D CEO Figure with natural breathing & subtle gesture */}
+          {/* Synchronized Multi-Frame Transparent Cutout Stack */}
           <motion.div
-            animate={idleMotion}
+            animate={figureMotion}
             whileHover={{ scale: 1.022, y: -4 }}
             transition={{
-              duration: isSpeaking ? 2.2 : 4.6,
+              duration: isSpeaking ? 1.65 : 4.6,
               repeat: Infinity,
               ease: 'easeInOut',
             }}
-            className="relative flex h-full w-full items-end justify-center"
+            className="relative flex h-full w-full items-end justify-center bg-transparent"
           >
-            <img
-              src={characterImgSrc}
-              alt={`${founderName} — ${founderTitle}`}
-              className="h-[96%] w-auto max-w-full object-contain object-bottom drop-shadow-[0_18px_36px_rgba(0,0,0,0.65)]"
-              style={{
-                maskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 82%, transparent 100%)',
-              }}
-            />
+            {hasCustomImg ? (
+              <img
+                src={character.customImageUrl}
+                alt={`${founderName} — ${founderTitle}`}
+                className="h-[97%] w-auto max-w-full bg-transparent object-contain object-bottom drop-shadow-[0_18px_28px_rgba(15,23,42,0.28)]"
+              />
+            ) : (
+              <div className="relative flex h-[97%] w-full items-end justify-center bg-transparent">
+                {/* Base Smile / Consonant Frame */}
+                <img
+                  src={frames.idle}
+                  alt={`${founderName} — ${founderTitle}`}
+                  className={`h-full w-auto max-w-full bg-transparent object-contain object-bottom drop-shadow-[0_18px_28px_rgba(15,23,42,0.28)] transition-opacity duration-100 ${
+                    showOpenFrame || showWaveFrame ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
+
+                {/* Preloaded Lip-Sync Open-Vowel & Subtle Hand Gesture Frame */}
+                <img
+                  src={frames.open}
+                  alt=""
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute bottom-0 h-full w-auto max-w-full bg-transparent object-contain object-bottom drop-shadow-[0_18px_28px_rgba(15,23,42,0.28)] transition-opacity duration-100 ${
+                    showOpenFrame ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
+
+                {/* Preloaded Greeting Hand-Wave Frame */}
+                {frames.wave && (
+                  <img
+                    src={frames.wave}
+                    alt=""
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute bottom-0 h-full w-auto max-w-full bg-transparent object-contain object-bottom drop-shadow-[0_18px_28px_rgba(15,23,42,0.28)] transition-opacity duration-150 ${
+                      showWaveFrame ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  />
+                )}
+              </div>
+            )}
           </motion.div>
         </div>
 
-        {/* Bottom Executive Identity Plate + Single Clean Web Speech Audio Control */}
-        <div className="relative z-20 border-t border-slate-800/90 bg-slate-950/90 px-6 py-4 backdrop-blur-xl space-y-3">
+        {/* Frosted Glass Identity Footer + Real-Time Word-by-Word Highlighted Speech Box */}
+        <div className="relative z-20 border-t border-slate-700/35 px-6 py-4 backdrop-blur-xl space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-1.5">
@@ -177,29 +222,58 @@ export const HeroCharacterCard: React.FC<HeroCharacterCardProps> = ({
               type="button"
               onClick={onToggleSpeak}
               aria-label={isSpeaking ? 'Stop CEO audio greeting' : 'Play CEO audio greeting'}
-              className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition ${
-                isSpeaking
-                  ? 'border-cyan-400 bg-cyan-500/20 text-cyan-200 shadow-lg shadow-cyan-500/20'
-                  : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:border-cyan-400 hover:bg-cyan-500/20'
-              }`}
+              className="keep-white-text inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold shadow-lg transition hover:opacity-95"
+              style={{
+                background: isSpeaking
+                  ? 'linear-gradient(135deg, #ef4444, #db2777)'
+                  : `linear-gradient(135deg, ${auraHex}, #6366f1)`,
+              }}
             >
               {isSpeaking ? (
                 <>
-                  <VolumeX className="h-4 w-4 text-cyan-300" />
+                  <VolumeX className="h-4 w-4" />
                   <span>Stop Audio</span>
                 </>
               ) : (
                 <>
-                  <Volume2 className="h-4 w-4 text-cyan-400" />
+                  <Volume2 className="h-4 w-4" />
                   <span>Play Intro</span>
                 </>
               )}
             </button>
           </div>
 
-          <p className="line-clamp-2 rounded-xl border border-slate-800/90 bg-slate-900/70 px-3 py-2 text-[11px] italic text-slate-300">
-            &ldquo;{voiceGreeting}&rdquo;
-          </p>
+          {/* Live Word-by-Word Karaoke Speech Transcript Box */}
+          <div
+            aria-live="polite"
+            className="max-h-24 overflow-y-auto rounded-2xl border border-slate-700/40 bg-slate-950/35 px-3.5 py-2.5 text-xs leading-relaxed no-scrollbar"
+          >
+            {words.map((word, idx) => {
+              const isCurrent = isSpeaking && idx === activeWordIndex;
+              const isPast = isSpeaking && idx < activeWordIndex;
+              return (
+                <span
+                  key={`${word}-${idx}`}
+                  className={`mr-1 inline-block rounded px-1 py-0.5 transition-all duration-100 ${
+                    isCurrent
+                      ? 'keep-white-text font-bold scale-105 shadow-sm'
+                      : isPast
+                        ? 'font-semibold text-white'
+                        : 'text-slate-300'
+                  }`}
+                  style={
+                    isCurrent
+                      ? {
+                          background: `linear-gradient(135deg, ${auraHex}, #6366f1)`,
+                        }
+                      : undefined
+                  }
+                >
+                  {word}
+                </span>
+              );
+            })}
+          </div>
         </div>
       </motion.div>
     </div>

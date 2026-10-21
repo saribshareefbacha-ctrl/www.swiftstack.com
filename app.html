@@ -1,21 +1,31 @@
 <!DOCTYPE html>
-<html lang="en" class="dark scroll-smooth">
+<html lang="en" class="scroll-smooth" data-theme="glass">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SwiftStack (SS) — Muhammad Sarib Randhawa | Digital Engineering & Full-Stack Studio</title>
+    <title id="dynamic-doc-title">SwiftStack (SS) — Muhammad Sarib Randhawa | Digital Agency &amp; Full-Stack Studio</title>
     <meta
+      id="dynamic-doc-description"
       name="description"
-      content="SwiftStack (SS), founded by Muhammad Sarib Randhawa — full-stack web & cloud engineering, SaaS architecture, mobile apps, and AI brand systems."
+      content="SwiftStack (SS), founded and owned by Muhammad Sarib Randhawa — elite full-stack web & SaaS engineering, mobile apps, cloud infrastructure, and AI media studio."
     />
+    <link id="dynamic-doc-favicon" rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('swiftstack_theme_mode_v3') || 'glass';
+          document.documentElement.setAttribute('data-theme', saved);
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-[#050b1a] text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200 overflow-x-hidden">
+  <body class="antialiased selection:bg-cyan-500/30 overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
