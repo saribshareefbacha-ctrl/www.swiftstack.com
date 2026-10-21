@@ -1,30 +1,26 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   base: './',
+  plugins: [react()],
   build: {
     outDir: 'docs',
     emptyOutDir: true,
     rollupOptions: {
-      input: path.resolve(process.cwd(), 'app.html'),
-    },
-  },
-  plugins: [
-    react(),
-    {
-      name: 'emit-docs-index',
-      closeBundle() {
-        const builtApp = path.resolve(process.cwd(), 'docs/app.html');
-        const targetIndex = path.resolve(process.cwd(), 'docs/index.html');
-        if (fs.existsSync(builtApp)) {
-          fs.renameSync(builtApp, targetIndex);
-        }
+      input: {
+        app: path.resolve(process.cwd(), 'app.html'),
+      },
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'framer-motion'],
+          'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/analytics'],
+          'three-vendor': ['three'],
+        },
       },
     },
-  ],
+  },
   server: {
     host: '0.0.0.0',
     allowedHosts: true,

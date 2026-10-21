@@ -15,6 +15,9 @@ import { ProjectItem, ThemeCMS } from '../types/cms';
 interface ProjectsSectionProps {
   projects: ProjectItem[];
   theme: ThemeCMS;
+  headingPrefix?: string;
+  headingHighlight?: string;
+  subheading?: string;
   isOwner: boolean;
   onManageProjects: () => void;
   onStartSimilarProject: (projectTitle: string) => void;
@@ -23,6 +26,9 @@ interface ProjectsSectionProps {
 export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
   projects,
   theme,
+  headingPrefix = 'Engineered by',
+  headingHighlight = 'SwiftStack (SS)',
+  subheading = 'Featured client builds across full-stack SaaS platforms, interactive web interfaces, signed mobile APKs, and flagship AI content ecosystems like @SoulSyllables.',
   isOwner,
   onManageProjects,
   onStartSimilarProject,
@@ -51,19 +57,18 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
               <span>Featured Portfolio &amp; Flagship Shipments</span>
             </div>
             <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
-              Engineered by{' '}
+              {headingPrefix}{' '}
               <span
                 className="bg-clip-text text-transparent"
                 style={{
                   backgroundImage: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent}, ${theme.tertiaryAccent})`,
                 }}
               >
-                SwiftStack (SS)
+                {headingHighlight}
               </span>
             </h2>
             <p className="text-slate-300/90 text-base sm:text-lg">
-              Select case studies across spatial 3D WebGL commerce, cloud SaaS infrastructure,
-              signed mobile APKs, and flagship AI content channels like @SoulSyllables.
+              {subheading}
             </p>
           </div>
 
