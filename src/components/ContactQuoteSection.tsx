@@ -9,7 +9,6 @@ interface ContactQuoteSectionProps {
   services: ServiceItem[];
   preselectedService: string;
   currentUser: UserProfile | null;
-  onInquiryCreated: () => void;
 }
 
 export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
@@ -18,15 +17,14 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
   services,
   preselectedService,
   currentUser,
-  onInquiryCreated,
 }) => {
   const [clientName, setClientName] = useState(currentUser?.displayName || '');
   const [clientEmail, setClientEmail] = useState(currentUser?.email || '');
   const [companyName, setCompanyName] = useState(currentUser?.company || '');
   const [serviceTitle, setServiceTitle] = useState(
-    preselectedService || services[0]?.title || '3D Web Design & Modern Front-End'
+    preselectedService || services[0]?.title || 'Full-Stack Web & SaaS Engineering'
   );
-  const [budgetRange, setBudgetRange] = useState('$2,500 – $5,000');
+  const [budgetRange, setBudgetRange] = useState('$3,000 – $7,500');
   const [timeline, setTimeline] = useState('2 – 4 Weeks');
   const [projectDetails, setProjectDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -53,6 +51,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
     setSubmitting(true);
     try {
       await api.submitInquiry({
+        clientId: currentUser?.id || null,
         clientName,
         clientEmail,
         companyName,
@@ -63,7 +62,6 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
       });
       setSubmittedSuccess(true);
       setProjectDetails('');
-      onInquiryCreated();
       setTimeout(() => setSubmittedSuccess(false), 6000);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to send request.');
@@ -74,39 +72,38 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
 
   return (
     <>
-      <section id="contact" className="relative py-24 sm:py-28">
+      <section id="order" className="relative py-24 sm:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
             {/* Left Direct Agency Overview */}
             <div className="lg:col-span-5 space-y-6">
               <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-300">
                 <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span>Initiate Collaboration</span>
+                <span>Start Your Order</span>
               </div>
 
               <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
-                Ready to Build Something{' '}
+                {hero.orderHeadingPrefix || 'Ready to Launch Something'}{' '}
                 <span
                   className="bg-clip-text text-transparent"
                   style={{
                     backgroundImage: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
                   }}
                 >
-                  Unforgettable?
+                  {hero.orderHeadingHighlight || 'Extraordinary?'}
                 </span>
               </h2>
 
               <p className="text-slate-300/90 text-base leading-relaxed">
-                Share your product roadmap, 3D experience concept, mobile APK build, or AI brand
-                vision. Muhammad Sarib Randhawa personally reviews every blueprint and responds with
-                a tailored architecture &amp; milestone quote.
+                {hero.orderSubheading ||
+                  'Submit your project requirements, SaaS roadmap, mobile app scope, or AI media package. Muhammad Sarib Randhawa reviews every inquiry directly and responds with a tailored architecture and milestone quote.'}
               </p>
 
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
                   <Mail className="w-5 h-5 text-cyan-400 shrink-0" />
                   <div>
-                    <div className="text-xs font-mono text-slate-400">Direct Studio Desk</div>
+                    <div className="text-xs font-mono text-slate-400">Direct Executive Desk</div>
                     <div className="text-sm font-semibold text-white">{hero.contactEmail}</div>
                   </div>
                 </div>
@@ -126,16 +123,16 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                 <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
                   <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" />
                   <div>
-                    <div className="text-xs font-mono text-slate-400">Client Portal Sync</div>
+                    <div className="text-xs font-mono text-slate-400">Real-Time Client Portal</div>
                     <div className="text-sm text-slate-300">
-                      Sign in anytime with your email or Google account to track live quote updates.
+                      Sign in with Google or your email anytime to track live order status and quotes.
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Interactive Quote Form */}
+            {/* Right Interactive Order & Quote Form */}
             <form
               onSubmit={handleSubmit}
               style={{
@@ -146,10 +143,10 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div>
                   <h3 className="font-display font-bold text-xl text-white">
-                    Request a Custom Project Quote
+                    Place an Order or Request Quote
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Zero obligation · Full technical scope &amp; milestone estimate
+                    Real-time cloud sync · Full technical scope &amp; milestone estimate
                   </p>
                 </div>
                 <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
@@ -167,8 +164,8 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                 <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center gap-3 text-sm text-emerald-200">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <span>
-                    Project brief received! Muhammad Sarib Randhawa&apos;s desk has logged your
-                    inquiry — track real-time updates anytime in your account portal.
+                    Order received! Your brief is synced to SwiftStack Cloud — open your Client
+                    Portal anytime to track real-time quote updates.
                   </span>
                 </div>
               )}
@@ -190,7 +187,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
 
                 <div>
                   <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Work or Personal Email *
+                    Work or Google Email *
                   </label>
                   <input
                     required
@@ -206,11 +203,11 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Company / Brand / Channel
+                    Company / Brand
                   </label>
                   <input
                     type="text"
-                    placeholder="Optional brand name"
+                    placeholder="Optional organization"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
@@ -248,11 +245,10 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     onChange={(e) => setBudgetRange(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
                   >
-                    <option value="$500 – $1,500">$500 – $1,500</option>
-                    <option value="$1,500 – $2,500">$1,500 – $2,500</option>
-                    <option value="$2,500 – $5,000">$2,500 – $5,000</option>
-                    <option value="$5,000 – $12,000">$5,000 – $12,000</option>
-                    <option value="$12,000+ Enterprise">$12,000+ Enterprise</option>
+                    <option value="$1,500 – $3,000">$1,500 – $3,000</option>
+                    <option value="$3,000 – $7,500">$3,000 – $7,500</option>
+                    <option value="$7,500 – $15,000">$7,500 – $15,000</option>
+                    <option value="$15,000+ Enterprise">$15,000+ Enterprise</option>
                   </select>
                 </div>
 
@@ -265,23 +261,22 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                     onChange={(e) => setTimeline(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
                   >
-                    <option value="ASAP / Rush Sprint">ASAP / Rush Sprint</option>
-                    <option value="1 – 2 Weeks">1 – 2 Weeks</option>
+                    <option value="Urgent (< 2 Weeks)">Urgent (&lt; 2 Weeks)</option>
                     <option value="2 – 4 Weeks">2 – 4 Weeks</option>
                     <option value="1 – 2 Months">1 – 2 Months</option>
-                    <option value="Ongoing Retainer">Ongoing Monthly Retainer</option>
+                    <option value="Ongoing Partnership">Ongoing Partnership</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                  Project Scope, Goals &amp; Inspiration *
+                  Project Scope &amp; Objectives *
                 </label>
                 <textarea
                   required
                   rows={4}
-                  placeholder="Tell us about your platform goals, key features, 3D visual ideas, or target audience..."
+                  placeholder="Describe your product goals, key features, timeline, or target audience..."
                   value={projectDetails}
                   onChange={(e) => setProjectDetails(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400 resize-none"
@@ -297,9 +292,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                 }}
               >
                 <Send className="w-4 h-4" />
-                <span>
-                  {submitting ? 'Transmitting Project Brief...' : 'Submit Project Brief to SwiftStack'}
-                </span>
+                <span>{submitting ? 'Submitting Order...' : 'Submit Order & Request Quote'}</span>
               </button>
             </form>
           </div>
@@ -323,7 +316,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
                 {hero.companyName} ({hero.companyAbbreviation}) · Founded by {hero.founderName}
               </div>
               <div className="text-xs text-slate-400">
-                Full-Stack Engineering · 3D Spatial Web · AI Media Studio ({hero.socialHandle})
+                Full-Stack Engineering · SaaS &amp; Cloud · AI Media Studio ({hero.socialHandle})
               </div>
             </div>
           </div>
@@ -335,13 +328,15 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
             <a href="#services" className="hover:text-white transition-colors">
               Services
             </a>
-            <a href="#avatar-studio" className="hover:text-white transition-colors">
-              3D Studio
-            </a>
             <a href="#projects" className="hover:text-white transition-colors">
               Projects
             </a>
-            <span>© {new Date().getFullYear()} {hero.companyName}. All rights reserved.</span>
+            <a href="#order" className="hover:text-white transition-colors">
+              Order &amp; Quote
+            </a>
+            <span>
+              © {new Date().getFullYear()} {hero.companyName}. All rights reserved.
+            </span>
           </div>
         </div>
       </footer>

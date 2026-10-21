@@ -1,68 +1,51 @@
-export type HairStyle = 'modern-quiff' | 'slick-side' | 'curly-crop' | 'wavy-flow' | 'buzz-fade';
-export type BeardStyle = 'full-groomed' | 'royal-boxed' | 'heavy-stubble' | 'goatee-trim' | 'clean-shaven';
-export type OutfitStyle = 'white-polo' | 'executive-blazer' | 'cyber-hoodie' | 'henley-casual' | 'waistcoat-modern';
-export type GlassesStyle = 'none' | 'clear-tech' | 'aviator' | 'round-studio' | 'cyber-shades';
-export type AvatarExpression = 'confident-smile' | 'friendly-grin' | 'focused-architect' | 'visionary';
+export type CharacterPresetStyle = 'executive-polo' | 'midnight-blazer' | 'tech-minimalist';
 
-export interface AvatarConfig {
-  skinTone: string;
-  hairStyle: HairStyle;
-  hairColor: string;
-  beardStyle: BeardStyle;
-  beardColor: string;
-  eyeColor: string;
-  eyebrowArch: number;
-  expression: AvatarExpression;
-  outfitStyle: OutfitStyle;
-  shirtPrimaryColor: string;
-  shirtTrimColor1: string;
-  shirtTrimColor2: string;
-  pantsColor: string;
-  glasses: GlassesStyle;
-  watch: boolean;
-  headset: boolean;
-  holoAura: boolean;
-}
-
-export interface HeroStat {
-  id: string;
-  value: string;
-  label: string;
+export interface CharacterConfig {
+  presetStyle: CharacterPresetStyle;
+  customImageUrl: string;
+  greetingBadgeText: string;
+  gestureAnimation: 'subtle' | 'dynamic' | 'still';
+  auraColor: string;
+  voiceRate: number;
+  voicePitch: number;
 }
 
 export interface HeroCMS {
   companyName: string;
   companyAbbreviation: string;
+  badgeText: string;
+  headlinePrefix: string;
+  headlineHighlight: string;
+  subheadline: string;
   founderName: string;
-  founderRole: string;
-  statusBadge: string;
-  heroHeadlinePrefix: string;
-  heroHeadlineHighlight: string;
-  heroHeadlineSuffix: string;
-  heroSubheading: string;
-  ceoBioTitle: string;
-  ceoBioText: string;
-  voiceGreetingScript: string;
+  founderTitle: string;
+  founderBio: string;
+  voiceGreeting: string;
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
+  servicesHeadingPrefix: string;
+  servicesHeadingHighlight: string;
+  servicesSubheading: string;
+  projectsHeadingPrefix: string;
+  projectsHeadingHighlight: string;
+  projectsSubheading: string;
+  orderHeadingPrefix: string;
+  orderHeadingHighlight: string;
+  orderSubheading: string;
   contactEmail: string;
   locationLabel: string;
   socialHandle: string;
-  stats: HeroStat[];
 }
 
 export interface ThemeCMS {
-  canvasBg: string;
+  backgroundHex: string;
   primaryAccent: string;
   secondaryAccent: string;
   tertiaryAccent: string;
   glassOpacity: number;
-  floatingShapeCount: number;
-  particleCount: number;
-  meshDistortion: number;
-  scrollMorphIntensity: number;
-  ambientGlowIntensity: number;
-  floatingShapesVariant: 'mixed-polyhedra' | 'torus-rings' | 'icosahedrons';
+  particleDensity: number;
+  scrollSpeed: number;
+  wireframeOpacity: number;
 }
 
 export interface ServiceItem {
@@ -128,7 +111,7 @@ export interface UserProfile {
 export interface SiteCMSData {
   hero: HeroCMS;
   theme: ThemeCMS;
-  avatar: AvatarConfig;
+  character: CharacterConfig;
   services: ServiceItem[];
   projects: ProjectItem[];
 }

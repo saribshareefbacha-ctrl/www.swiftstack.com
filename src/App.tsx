@@ -1,216 +1,150 @@
-import React, { useEffect, useState } from 'react';
-import { Sliders } from 'lucide-react';
-import { DEFAULT_CMS_DATA } from './data/defaultSeed';
-import { AvatarConfig, InquiryItem, SiteCMSData, UserProfile } from './types/cms';
-import { api, getStoredToken, setStoredToken } from './utils/api';
-import { SpeechFrameState, speechEngine } from './utils/speechEngine';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from './data/defaultSeed';
+import { InquiryItem, SiteCMSData, UserProfile } from './types/cms';
+import { api } from './utils/api';
 import { ScrollScene3D } from './components/three/ScrollScene3D';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
-import { AvatarStudioSection } from './components/AvatarStudioSection';
 import { ProjectsSection } from './components/ProjectsSection';
 import { ContactQuoteSection } from './components/ContactQuoteSection';
 import { AuthModal } from './components/AuthModal';
 import { ClientPortalModal } from './components/ClientPortalModal';
-import { AdminCustomizationPanel, AdminTabId } from './components/AdminCustomizationPanel';
+import { AdminCustomizationPanel, AdminTab } from './components/AdminCustomizationPanel';
 
-export const App: React.FC = () => {
+export function App() {
   const [cmsData, setCmsData] = useState<SiteCMSData>(DEFAULT_CMS_DATA);
+  const [orders, setOrders] = useState<InquiryItem[]>(INITIAL_SAMPLE_INQUIRIES);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [speechState, setSpeechState] = useState<SpeechFrameState>(speechEngine.getState());
-
-  // Modals & Drawers
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [clientPortalOpen, setClientPortalOpen] = useState(false);
-  const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
-  const [adminActiveTab, setAdminActiveTab] = useState<AdminTabId>('hero');
-  const [elevationBanner, setElevationBanner] = useState<string>('');
+  const [ownerStudioOpen, setOwnerStudioOpen] = useState(false);
+  const [ownerStudioTab, setOwnerStudioTab] = useState<AdminTab>('hero');
+  const [selectedServiceForQuote, setSelectedServiceForQuote] = useState('');
 
-  // Inquiries & Service Quote Selection
-  const [ownerInquiries, setOwnerInquiries] = useState<InquiryItem[]>([]);
-  const [preselectedService, setPreselectedService] = useState<string>(
-    DEFAULT_CMS_DATA.services[0]?.title || ''
-  );
-
-  // Subscribe to real-time 60fps Avatar Speech & Viseme Engine
+  // Real-time Firebase Cloud Subscriptions (CMS + Orders + Auth)
   useEffect(() => {
-    const unsub = speechEngine.subscribe((next) => setSpeechState(next));
-    // Warm up speechSynthesis voice registry on mount
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.getVoices();
-    }
-    return unsub;
+    const unsubCMS = api.subscribeCMS((liveCMS) => {
+      setCmsData(liveCMS);
+    });
+    const unsubOrders = api.subscribeOrders((liveOrders) => {
+      setOrders(liveOrders);
+    });
+    const unsubAuth = api.subscribeAuth((user) => {
+      setCurrentUser(user);
+    });
+
+    return () => {
+      unsubCMS();
+      unsubOrders();
+      unsubAuth();
+    };
   }, []);
 
-  // Hydrate Dynamic CMS Data & Restore Authenticated Session
-  useEffect(() => {
-    api
-      .getCMS()
-      .then((remote) => {
-        setCmsData(remote);
-      })
-      .catch(() => {
-        // Fallback to local seed seamlessly
-      });
+  const activeClientOrdersCount = useMemo(() => {
+    if (!currentUser || currentUser.role === 'owner') return 0;
+    const emailClean = (currentUser.email || '').toLowerCase();
+    return orders.filter(
+      (o) =>
+        o.clientId === currentUser.id ||
+        (emailClean && o.clientEmail.toLowerCase() === emailClean)
+    ).length;
+  }, [orders, currentUser]);
 
-    if (getStoredToken()) {
-      api
-        .getMe()
-        .then((res) => {
-          if (res.user) {
-            setCurrentUser(res.user);
-            if (res.user.role === 'owner') {
-              api
-                .getAllInquiries()
-                .then((r) => setOwnerInquiries(r.inquiries))
-                .catch(() => {});
-            }
-          } else {
-            setStoredToken(null);
-          }
-        })
-        .catch(() => {
-          setStoredToken(null);
-        });
-    }
-  }, []);
-
-  const isOwner = currentUser?.role === 'owner';
+  const openOwnerTab = (tab: AdminTab) => {
+    setOwnerStudioTab(tab);
+    setOwnerStudioOpen(true);
+  };
 
   const handleAuthenticated = (user: UserProfile) => {
     setCurrentUser(user);
     if (user.role === 'owner') {
-      api
-        .getAllInquiries()
-        .then((r) => setOwnerInquiries(r.inquiries))
-        .catch(() => {});
-      setElevationBanner(
-        `Welcome back, ${user.displayName} — Full Dynamic Platform Control Unlocked.`
-      );
-      setTimeout(() => setElevationBanner(''), 5000);
-      setAdminActiveTab('hero');
-      setAdminDrawerOpen(true);
+      openOwnerTab('hero');
     } else {
       setClientPortalOpen(true);
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await api.logout();
-    } catch {
-      // ignore
-    }
-    setStoredToken(null);
+    await api.logout();
     setCurrentUser(null);
-    setAdminDrawerOpen(false);
+    setOwnerStudioOpen(false);
     setClientPortalOpen(false);
   };
 
-  const handleAvatarLiveChange = (nextAvatar: AvatarConfig) => {
-    setCmsData((prev) => ({
-      ...prev,
-      avatar: nextAvatar,
-    }));
+  const scrollToSection = (selector: string) => {
+    const el = document.querySelector(selector);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSaveGlobalAvatar = async (nextAvatar: AvatarConfig) => {
-    const res = await api.updateAvatar(nextAvatar);
-    setCmsData((prev) => ({
-      ...prev,
-      avatar: res.avatar,
-    }));
+  const handleSelectServiceForOrder = (serviceTitle: string) => {
+    setSelectedServiceForQuote(serviceTitle);
+    scrollToSection('#order');
   };
 
-  const handleSelectServiceForQuote = (serviceTitle: string) => {
-    setPreselectedService(serviceTitle);
-    const contactEl = document.getElementById('contact');
-    contactEl?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const openOwnerTab = (tab: AdminTabId) => {
-    setAdminActiveTab(tab);
-    setAdminDrawerOpen(true);
-  };
-
-  const unreadLeadsCount = ownerInquiries.filter((i) => i.status === 'new').length;
+  const isOwner = currentUser?.role === 'owner';
 
   return (
-    <div className="relative min-h-screen text-slate-100 selection:bg-cyan-500/30">
-      {/* Scroll-Driven Dynamic 3D Background Canvas & Lighting Morph */}
-      <ScrollScene3D theme={cmsData.theme} />
+    <div
+      className="relative min-h-screen overflow-x-clip text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-100"
+      style={{ backgroundColor: cmsData.theme.backgroundHex }}
+    >
+      {/* Clean Background Architectural Atmosphere (Zero Floating Avatar Stages) */}
+      <ScrollScene3D
+        primaryHex={cmsData.theme.primaryAccent}
+        secondaryHex={cmsData.theme.secondaryAccent}
+        accentHex={cmsData.theme.tertiaryAccent}
+        particleDensity={cmsData.theme.particleDensity}
+        scrollSpeed={cmsData.theme.scrollSpeed}
+        wireframeOpacity={cmsData.theme.wireframeOpacity}
+      />
 
-      {/* Top Glassmorphic Navigation Bar */}
+      {/* Sleek Conversion Navbar */}
       <Navbar
-        hero={cmsData.hero}
-        theme={cmsData.theme}
+        primaryColor={cmsData.theme.primaryAccent}
+        secondaryColor={cmsData.theme.secondaryAccent}
         currentUser={currentUser}
-        unreadInquiriesCount={unreadLeadsCount}
-        onOpenAuthModal={() => setAuthModalOpen(true)}
-        onOpenClientPortal={() => setClientPortalOpen(true)}
-        onOpenAdminPanel={() => openOwnerTab('hero')}
+        activeOrdersCount={activeClientOrdersCount}
+        onOpenAuth={() => setAuthModalOpen(true)}
+        onOpenPortal={() => setClientPortalOpen(true)}
+        onOpenOwnerStudio={() => openOwnerTab('hero')}
         onLogout={handleLogout}
       />
 
-      {/* Discreet Owner Elevation Toast */}
-      {elevationBanner && (
-        <div className="fixed bottom-6 left-6 z-50 max-w-md px-5 py-3.5 rounded-2xl bg-slate-900/95 border border-cyan-400/50 text-xs sm:text-sm font-medium text-cyan-200 shadow-2xl backdrop-blur-xl">
-          {elevationBanner}
-        </div>
-      )}
-
-      {/* Floating Silent Owner Quick-Access Trigger (Strictly ONLY rendered when Owner is signed in) */}
-      {isOwner && !adminDrawerOpen && (
-        <button
-          type="button"
-          onClick={() => openOwnerTab('hero')}
-          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2.5 px-5 py-3.5 rounded-2xl font-display font-bold text-sm text-slate-950 shadow-[0_12px_40px_rgba(6,182,212,0.5)] hover:scale-105 transition-transform"
-          style={{
-            background: `linear-gradient(135deg, ${cmsData.theme.primaryAccent}, ${cmsData.theme.secondaryAccent})`,
-          }}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>Customize SwiftStack</span>
-        </button>
-      )}
-
-      {/* Main Public & Interactive Sections */}
-      <main>
+      {/* Main Content Flow: Hero (Single Executive CEO Character) -> Services -> Projects -> Order */}
+      <main className="relative z-10">
         <HeroSection
           hero={cmsData.hero}
-          theme={cmsData.theme}
-          avatarConfig={cmsData.avatar}
-          speechState={speechState}
+          character={cmsData.character}
+          primaryColor={cmsData.theme.primaryAccent}
+          secondaryColor={cmsData.theme.secondaryAccent}
           isOwner={isOwner}
-          onQuickEditHero={() => openOwnerTab('hero')}
+          onExploreWork={() => scrollToSection('#projects')}
+          onStartOrder={() => scrollToSection('#order')}
+          onEditCharacter={() => openOwnerTab('character')}
         />
 
         <ServicesSection
           services={cmsData.services}
           theme={cmsData.theme}
+          headingPrefix={cmsData.hero.servicesHeadingPrefix}
+          headingHighlight={cmsData.hero.servicesHeadingHighlight}
+          subheading={cmsData.hero.servicesSubheading}
           isOwner={isOwner}
-          onSelectServiceForQuote={handleSelectServiceForQuote}
+          onSelectServiceForQuote={handleSelectServiceForOrder}
           onManageServices={() => openOwnerTab('services')}
-        />
-
-        <AvatarStudioSection
-          avatarConfig={cmsData.avatar}
-          onChangeAvatar={handleAvatarLiveChange}
-          onSaveGlobalAvatar={isOwner ? handleSaveGlobalAvatar : undefined}
-          voiceScript={cmsData.hero.voiceGreetingScript}
-          speechState={speechState}
-          theme={cmsData.theme}
-          isOwner={isOwner}
         />
 
         <ProjectsSection
           projects={cmsData.projects}
           theme={cmsData.theme}
+          headingPrefix={cmsData.hero.projectsHeadingPrefix}
+          headingHighlight={cmsData.hero.projectsHeadingHighlight}
+          subheading={cmsData.hero.projectsSubheading}
           isOwner={isOwner}
           onManageProjects={() => openOwnerTab('projects')}
-          onStartSimilarProject={(title) =>
-            handleSelectServiceForQuote(`Custom Architecture (${title})`)
+          onStartSimilarProject={(projectTitle) =>
+            handleSelectServiceForOrder(`Similar to: ${projectTitle}`)
           }
         />
 
@@ -218,52 +152,46 @@ export const App: React.FC = () => {
           hero={cmsData.hero}
           theme={cmsData.theme}
           services={cmsData.services}
-          preselectedService={preselectedService}
+          preselectedService={selectedServiceForQuote}
           currentUser={currentUser}
-          onInquiryCreated={() => {
-            if (isOwner) {
-              api
-                .getAllInquiries()
-                .then((r) => setOwnerInquiries(r.inquiries))
-                .catch(() => {});
-            }
-          }}
         />
       </main>
 
-      {/* Unified Secure Sign-In / Continue Modal */}
+      {/* Unified Sign-In Modal (Firebase Google Login + Email Auth + Hidden 'admin' / 'admin') */}
       <AuthModal
-        open={authModalOpen}
-        hero={cmsData.hero}
-        theme={cmsData.theme}
+        isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthenticated={handleAuthenticated}
+        primaryColor={cmsData.theme.primaryAccent}
+        secondaryColor={cmsData.theme.secondaryAccent}
       />
 
-      {/* Client Portal Modal (Profile & Project Requests) */}
-      <ClientPortalModal
-        open={clientPortalOpen}
-        user={currentUser}
-        services={cmsData.services}
-        theme={cmsData.theme}
-        onClose={() => setClientPortalOpen(false)}
-        onUserUpdated={(updated) => setCurrentUser(updated)}
-      />
+      {/* Client Workspace Portal (Strictly Services, Projects & Live Order Tracking) */}
+      {currentUser && currentUser.role === 'client' && (
+        <ClientPortalModal
+          isOpen={clientPortalOpen}
+          onClose={() => setClientPortalOpen(false)}
+          user={currentUser}
+          services={cmsData.services}
+          projects={cmsData.projects}
+          allOrders={orders}
+          onUserUpdated={setCurrentUser}
+          primaryColor={cmsData.theme.primaryAccent}
+        />
+      )}
 
-      {/* Hidden Owner Customization Control Studio (Strictly mounted ONLY when authenticated as Owner) */}
+      {/* Owner Real-Time CMS Dashboard (Unlocked Exclusively by Hidden 'admin' / 'admin') */}
       {isOwner && (
         <AdminCustomizationPanel
-          open={adminDrawerOpen}
-          initialTab={adminActiveTab}
+          isOpen={ownerStudioOpen}
+          initialTab={ownerStudioTab}
+          onClose={() => setOwnerStudioOpen(false)}
           cmsData={cmsData}
-          inquiries={ownerInquiries}
-          onClose={() => setAdminDrawerOpen(false)}
-          onCMSChange={setCmsData}
-          onInquiriesChange={setOwnerInquiries}
+          orders={orders}
+          onCMSUpdated={setCmsData}
         />
       )}
     </div>
   );
-};
-
+}
 export default App;

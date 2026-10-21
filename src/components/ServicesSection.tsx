@@ -20,6 +20,9 @@ import { ServiceItem, ThemeCMS } from '../types/cms';
 interface ServicesSectionProps {
   services: ServiceItem[];
   theme: ThemeCMS;
+  headingPrefix?: string;
+  headingHighlight?: string;
+  subheading?: string;
   isOwner: boolean;
   onSelectServiceForQuote: (serviceTitle: string) => void;
   onManageServices: () => void;
@@ -170,6 +173,9 @@ const Interactive3DServiceCard: React.FC<{
 export const ServicesSection: React.FC<ServicesSectionProps> = ({
   services,
   theme,
+  headingPrefix = 'Full-Spectrum Engineering,',
+  headingHighlight = 'Cloud Architecture & AI Media',
+  subheading = 'Every engagement combines precision software engineering with clean visual direction — architected end-to-end under Muhammad Sarib Randhawa.',
   isOwner,
   onSelectServiceForQuote,
   onManageServices,
@@ -200,19 +206,18 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
               <span>SwiftStack (SS) Capabilities Matrix</span>
             </div>
             <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
-              Full-Spectrum Engineering,{' '}
+              {headingPrefix}{' '}
               <span
                 className="bg-clip-text text-transparent"
                 style={{
                   backgroundImage: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
                 }}
               >
-                3D Design &amp; AI Media
+                {headingHighlight}
               </span>
             </h2>
             <p className="text-slate-300/90 text-base sm:text-lg">
-              Every engagement combines precision software engineering with world-class visual
-              direction — architected end-to-end under Muhammad Sarib Randhawa.
+              {subheading}
             </p>
           </div>
 
