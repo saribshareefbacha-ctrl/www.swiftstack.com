@@ -23,9 +23,8 @@ export function buildGlowingFaviconDataUrl(
 export function syncDocumentBranding(branding: SiteBrandingMeta, theme: ThemeCMS): void {
   if (typeof document === 'undefined') return;
 
-  if (branding.pageTitle) {
-    document.title = branding.pageTitle;
-  }
+  const computedTitle = `${branding.companyName || 'SwiftStack'} (${branding.monogram || 'SS'}) — Digital Engineering & AI Studio | ${branding.founderName || 'Muhammad Sarib Randhawa'}`;
+  document.title = computedTitle;
 
   let metaDesc = document.querySelector('meta[name="description"]');
   if (!metaDesc) {
@@ -33,8 +32,8 @@ export function syncDocumentBranding(branding: SiteBrandingMeta, theme: ThemeCMS
     metaDesc.setAttribute('name', 'description');
     document.head.appendChild(metaDesc);
   }
-  if (branding.metaDescription) {
-    metaDesc.setAttribute('content', branding.metaDescription);
+  if (branding.footerTagline) {
+    metaDesc.setAttribute('content', branding.footerTagline);
   }
 
   let linkIcon = document.querySelector<HTMLLinkElement>('link[rel*="icon"]');
@@ -44,15 +43,15 @@ export function syncDocumentBranding(branding: SiteBrandingMeta, theme: ThemeCMS
     document.head.appendChild(linkIcon);
   }
 
-  if (branding.faviconUrl && branding.faviconUrl.trim().length > 0) {
+  if (branding.profileIconUrl && branding.profileIconUrl.trim().length > 0) {
     linkIcon.type = 'image/png';
-    linkIcon.href = branding.faviconUrl.trim();
+    linkIcon.href = branding.profileIconUrl.trim();
   } else {
     linkIcon.type = 'image/svg+xml';
     linkIcon.href = buildGlowingFaviconDataUrl(
-      branding.faviconMonogram || 'SS',
-      theme.primaryAccent,
-      theme.secondaryAccent
+      branding.monogram || 'SS',
+      theme.primaryColor,
+      theme.secondaryColor
     );
   }
 }

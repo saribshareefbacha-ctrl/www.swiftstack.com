@@ -1,58 +1,52 @@
-export type ThemeMode = 'glass' | 'dark' | 'cyber';
+export type ThemeMode = 'glass' | 'light' | 'dark' | 'cyber';
+
+export type ViewLayoutMode = 'desktop' | 'mobile';
 
 export type VoiceGender = 'male' | 'female';
 
 export interface SiteBrandingMeta {
-  pageTitle: string;
-  metaDescription: string;
-  faviconUrl: string;
-  faviconMonogram: string;
+  companyName: string;
+  monogram: string;
+  founderName: string;
+  founderTitle: string;
+  contactEmail: string;
+  locationText: string;
+  footerTagline: string;
+  copyrightText: string;
   profileIconUrl: string;
+}
+
+export interface HeroCMS {
+  badgeText: string;
+  headlinePrefix: string;
+  headlineGradient: string;
+  headlineSuffix: string;
+  subheadline: string;
+  introSpeechText: string;
+  primaryCtaLabel: string;
+  secondaryCtaLabel: string;
+  stat1Value: string;
+  stat1Label: string;
+  stat2Value: string;
+  stat2Label: string;
+  stat3Value: string;
+  stat3Label: string;
 }
 
 export interface VoiceEngineConfig {
   voiceGender: VoiceGender;
-  speechFrequency: number; // Speech rate/cadence (0.65 - 1.40)
-  voicePitch: number; // Pitch tuning (0.65 - 1.35)
+  voicePitch: number;
+  speechFrequency: number;
+  highlightDelayMs: number;
   pakistaniAccentPhonetics: boolean;
   preferredVoiceURI: string;
 }
 
-export interface HeroCMS {
-  companyName: string;
-  companyAbbreviation: string;
-  badgeText: string;
-  headlinePrefix: string;
-  headlineHighlight: string;
-  subheadline: string;
-  founderName: string;
-  founderTitle: string;
-  founderBio: string;
-  voiceStageLabel: string;
-  voiceGreeting: string;
-  primaryCtaLabel: string;
-  secondaryCtaLabel: string;
-  servicesHeadingPrefix: string;
-  servicesHeadingHighlight: string;
-  servicesSubheading: string;
-  projectsHeadingPrefix: string;
-  projectsHeadingHighlight: string;
-  projectsSubheading: string;
-  orderHeadingPrefix: string;
-  orderHeadingHighlight: string;
-  orderSubheading: string;
-  contactEmail: string;
-  locationLabel: string;
-  socialHandle: string;
-}
-
 export interface ThemeCMS {
   defaultMode: ThemeMode;
-  primaryAccent: string;
-  secondaryAccent: string;
-  tertiaryAccent: string;
-  robotDensity: number;
-  rippleIntensity: number;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
 }
 
 export interface ServiceItem {
@@ -67,16 +61,6 @@ export interface ServiceItem {
   iconName: string;
   accentHex: string;
   featured: boolean;
-}
-
-export interface CartItem {
-  serviceId: string;
-  title: string;
-  category: string;
-  priceLabel: string;
-  basePriceUsd: number;
-  turnaround: string;
-  quantity: number;
 }
 
 export interface ProjectItem {
@@ -95,11 +79,50 @@ export interface ProjectItem {
   featured: boolean;
 }
 
-export type InquiryStatus = 'new' | 'reviewing' | 'quoted' | 'in-progress' | 'completed';
+export interface SubAdminPermissions {
+  canEditHero: boolean;
+  canManageServices: boolean;
+  canManageProjects: boolean;
+  canManageTheme: boolean;
+  canManageOrders: boolean;
+}
+
+export interface SubAdminAccount {
+  id: string;
+  displayName: string;
+  username: string;
+  email: string;
+  password: string;
+  permissions: SubAdminPermissions;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface SiteCMSData {
+  branding: SiteBrandingMeta;
+  hero: HeroCMS;
+  voice: VoiceEngineConfig;
+  theme: ThemeCMS;
+  services: ServiceItem[];
+  projects: ProjectItem[];
+  subAdmins: SubAdminAccount[];
+}
+
+export interface CartItem {
+  serviceId: string;
+  title: string;
+  category: string;
+  priceLabel: string;
+  basePriceUsd: number;
+  quantity: number;
+  turnaround?: string;
+}
+
+export type InquiryStatus = 'new' | 'in_review' | 'quoted' | 'in_progress' | 'completed';
 
 export interface InquiryItem {
   id: string;
-  clientId?: string | null;
+  clientId: string | null;
   clientName: string;
   clientEmail: string;
   companyName: string;
@@ -115,23 +138,6 @@ export interface InquiryItem {
   updatedAt: string;
 }
 
-export interface SubAdminPermissions {
-  canManageServices: boolean;
-  canManageProjects: boolean;
-  canManageOrders: boolean;
-}
-
-export interface SubAdminAccount {
-  id: string;
-  displayName: string;
-  username: string;
-  email: string;
-  password: string;
-  permissions: SubAdminPermissions;
-  active: boolean;
-  createdAt: string;
-}
-
 export interface UserProfile {
   id: string;
   username: string;
@@ -139,18 +145,8 @@ export interface UserProfile {
   displayName: string;
   company: string;
   avatarUrl?: string;
-  authProvider: 'credentials' | 'google';
+  authProvider: 'google' | 'credentials';
   role: 'owner' | 'subadmin' | 'client';
   permissions?: SubAdminPermissions;
   createdAt: string;
-}
-
-export interface SiteCMSData {
-  branding: SiteBrandingMeta;
-  hero: HeroCMS;
-  voice: VoiceEngineConfig;
-  theme: ThemeCMS;
-  services: ServiceItem[];
-  projects: ProjectItem[];
-  subAdmins: SubAdminAccount[];
 }

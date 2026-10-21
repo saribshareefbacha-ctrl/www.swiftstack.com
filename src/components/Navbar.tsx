@@ -1,355 +1,455 @@
 import React, { useState } from 'react';
 import {
-  Briefcase,
-  Cpu,
-  Layers,
+  Crown,
+  LayoutDashboard,
   LogOut,
   Menu,
+  Monitor,
   Moon,
-  ShoppingBag,
-  Sliders,
+  ShieldCheck,
+  ShoppingCart,
+  Smartphone,
   Sparkles,
-  User,
+  Sun,
+  User as UserIcon,
   X,
+  Zap,
 } from 'lucide-react';
-import { ThemeMode, UserProfile } from '../types/cms';
 import { SwiftStackLogo } from './SwiftStackLogo';
+import { ThemeMode, UserProfile, ViewLayoutMode } from '../types/cms';
 
 interface NavbarProps {
+  currentUser: UserProfile | null;
   primaryColor: string;
   secondaryColor: string;
   companyName: string;
   monogram: string;
   profileIconUrl: string;
   themeMode: ThemeMode;
-  onChangeThemeMode: (mode: ThemeMode) => void;
+  viewMode: ViewLayoutMode;
   cartCount: number;
+  onChangeThemeMode: (mode: ThemeMode) => void;
+  onToggleViewMode: (nextMode: ViewLayoutMode) => void;
+  onOpenAuth: (tab?: 'login' | 'register') => void;
+  onOpenAdminPanel: () => void;
+  onOpenClientPortal: () => void;
   onOpenCart: () => void;
-  currentUser: UserProfile | null;
-  activeOrdersCount?: number;
-  onOpenAuth: () => void;
-  onOpenPortal: () => void;
-  onOpenOwnerStudio: () => void;
   onLogout: () => void;
 }
 
-const THEME_OPTIONS: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
-  { id: 'glass', label: 'Glass', icon: <Layers className="h-3.5 w-3.5" /> },
-  { id: 'dark', label: 'Dark', icon: <Moon className="h-3.5 w-3.5" /> },
-  { id: 'cyber', label: 'Cyber', icon: <Cpu className="h-3.5 w-3.5" /> },
+const THEME_OPTIONS: { id: ThemeMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'glass', label: 'Sheesha Glass', icon: Sparkles },
+  { id: 'light', label: 'Crystal Light', icon: Sun },
+  { id: 'dark', label: 'Obsidian Dark', icon: Moon },
+  { id: 'cyber', label: 'Cyber Neon', icon: Zap },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({
+  currentUser,
   primaryColor,
   secondaryColor,
   companyName,
   monogram,
   profileIconUrl,
   themeMode,
-  onChangeThemeMode,
+  viewMode,
   cartCount,
-  onOpenCart,
-  currentUser,
-  activeOrdersCount = 0,
+  onChangeThemeMode,
+  onToggleViewMode,
   onOpenAuth,
-  onOpenPortal,
-  onOpenOwnerStudio,
+  onOpenAdminPanel,
+  onOpenClientPortal,
+  onOpenCart,
   onLogout,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
+    { label: 'Home', href: '#hero' },
     { label: 'Services & Shop', href: '#services' },
-    { label: 'Projects', href: '#projects' },
-    { label: 'Checkout & Quote', href: '#order' },
+    { label: 'Portfolio', href: '#projects' },
+    { label: 'Order & Quote', href: '#order' },
   ];
 
-  const scrollTo = (id: string) => {
-    setMobileMenuOpen(false);
-    const el = document.querySelector(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const isStaff = currentUser?.role === 'owner' || currentUser?.role === 'subadmin';
+  const nextViewMode: ViewLayoutMode = viewMode === 'desktop' ? 'mobile' : 'desktop';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 px-4 sm:px-8 pt-4">
-      <nav className="ss-glass-card mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl px-5 py-3">
-        <a
-          href="#hero"
-          onClick={(e) => {
-            e.preventDefault();
-            scrollTo('#hero');
-          }}
-        >
-          <SwiftStackLogo
-            primaryColor={primaryColor}
-            secondaryColor={secondaryColor}
-            companyName={companyName}
-            monogram={monogram}
-            profileIconUrl={profileIconUrl}
-          />
-        </a>
-
-        {/* Desktop Navigation Links */}
-        <div className="hidden xl:flex items-center gap-7">
-          {navLinks.map((link) => (
-            <button
-              key={link.href}
-              type="button"
-              onClick={() => scrollTo(link.href)}
-              className="text-sm font-semibold text-slate-300 transition hover:text-cyan-400"
-            >
-              {link.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Right Controls: Glass Theme Switcher + Cart + Unified Auth */}
-        <div className="hidden md:flex items-center gap-2.5">
-          {/* Theme Mode Switcher */}
-          <div
-            role="group"
-            aria-label="Theme Switcher"
-            className="ss-glass-card flex items-center rounded-xl p-1"
+    <header className="ss-top-header fixed top-0 left-0 right-0 z-40 px-3 sm:px-6 pt-3">
+      <nav
+        aria-label="SwiftStack primary navigation"
+        className="ss-glass-card mx-auto max-w-7xl rounded-2xl px-4 sm:px-6 py-3"
+      >
+        <div className="flex items-center justify-between gap-2.5">
+          {/* SwiftStack Monogram & Brand */}
+          <a
+            href="#hero"
+            className="focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-xl shrink-0"
           >
-            {THEME_OPTIONS.map((opt) => {
-              const active = themeMode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => onChangeThemeMode(opt.id)}
-                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
-                    active ? 'keep-white-text shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                  style={
-                    active
-                      ? {
-                          backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                        }
-                      : undefined
-                  }
-                >
-                  {opt.icon}
-                  <span>{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            <SwiftStackLogo
+              primaryColor={primaryColor}
+              secondaryColor={secondaryColor}
+              companyName={companyName}
+              monogram={monogram}
+              profileIconUrl={profileIconUrl}
+            />
+          </a>
 
-          {/* Shopping Portal Cart Trigger */}
-          <button
-            type="button"
-            onClick={onOpenCart}
-            className="ss-glass-btn relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
-            aria-label="Shopping Cart"
-          >
-            <ShoppingBag className="h-4 w-4 text-cyan-400" />
-            <span>Cart</span>
-            {cartCount > 0 && (
-              <span
-                className="keep-white-text ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                {cartCount}
-              </span>
-            )}
-          </button>
-
-          {currentUser ? (
-            <>
-              {isStaff ? (
-                <button
-                  type="button"
-                  onClick={onOpenOwnerStudio}
-                  className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold text-cyan-400"
-                >
-                  <Sliders className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>{currentUser.role === 'owner' ? 'Owner CMS' : 'Sub-Admin Portal'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onOpenPortal}
-                  className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold"
-                >
-                  <Briefcase className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>{currentUser.displayName.split(' ')[0]}'s Portal</span>
-                  {activeOrdersCount > 0 && (
-                    <span className="ml-0.5 rounded-full bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-bold text-cyan-400">
-                      {activeOrdersCount}
-                    </span>
-                  )}
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={onLogout}
-                title="Sign Out"
-                className="ss-glass-btn inline-flex items-center justify-center rounded-xl p-2 text-slate-400 hover:text-rose-400"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={onOpenAuth}
-                className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold"
-              >
-                <User className="h-4 w-4 text-cyan-400" />
-                <span>Sign In</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => scrollTo('#order')}
-                className="keep-white-text ss-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-lg"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Start Order</span>
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Mobile Menu Button */}
-        <div className="flex items-center gap-2 md:hidden">
-          <button
-            type="button"
-            onClick={onOpenCart}
-            className="ss-glass-btn relative rounded-xl p-2"
-            aria-label="Open Cart"
-          >
-            <ShoppingBag className="h-4 w-4 text-cyan-400" />
-            {cartCount > 0 && (
-              <span
-                className="keep-white-text absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
-                style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                {cartCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle Menu"
-            className="ss-glass-btn rounded-xl p-2"
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
-      </nav>
-
-      {/* Mobile Glass Drawer */}
-      {mobileMenuOpen && (
-        <div className="ss-modal-surface mx-auto mt-2 max-w-7xl rounded-2xl p-5 md:hidden space-y-4">
-          <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-400/25 p-1">
-            {THEME_OPTIONS.map((opt) => {
-              const active = themeMode === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => onChangeThemeMode(opt.id)}
-                  className={`flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-semibold ${
-                    active ? 'keep-white-text' : 'text-slate-400'
-                  }`}
-                  style={
-                    active
-                      ? {
-                          backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                        }
-                      : undefined
-                  }
-                >
-                  {opt.icon}
-                  <span>{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-col space-y-1.5">
+          {/* Navigation Links (Desktop View) */}
+          <div className="ss-desktop-nav-only hidden xl:flex items-center gap-6">
             {navLinks.map((link) => (
-              <button
+              <a
                 key={link.href}
-                type="button"
-                onClick={() => scrollTo(link.href)}
-                className="rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-200 hover:bg-cyan-500/10"
+                href={link.href}
+                className="text-sm font-semibold text-slate-200 hover:text-cyan-300 transition-colors"
               >
                 {link.label}
-              </button>
+              </a>
             ))}
           </div>
 
-          <div className="border-t border-slate-400/25 pt-3 flex flex-col gap-2.5">
+          {/* Right Controls: View Toggle, Sheesha Theme Switcher, Cart & Auth/Admin */}
+          <div className="ss-desktop-nav-only hidden lg:flex items-center gap-2">
+            {/* Persistent Anytime Desktop View <-> Mobile View Toggle */}
+            <button
+              type="button"
+              onClick={() => onToggleViewMode(nextViewMode)}
+              title={`Currently in ${viewMode === 'desktop' ? 'Desktop View' : 'Mobile View'} — Click to switch to ${nextViewMode === 'desktop' ? 'Desktop View' : 'Mobile View'}`}
+              className="ss-glass-btn inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold text-cyan-300"
+            >
+              {viewMode === 'desktop' ? (
+                <>
+                  <Monitor className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Desktop</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Mobile</span>
+                </>
+              )}
+            </button>
+
+            {/* Theme Mode Switcher */}
+            <div
+              role="group"
+              aria-label="Visual Theme Mode"
+              className="ss-glass-card inline-flex items-center rounded-xl p-1 gap-0.5"
+            >
+              {THEME_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const active = themeMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onChangeThemeMode(opt.id)}
+                    title={opt.label}
+                    aria-label={opt.label}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      active
+                        ? 'keep-white-text text-white shadow-sm'
+                        : 'text-slate-300 hover:text-white'
+                    }`}
+                    style={
+                      active
+                        ? {
+                            backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden 2xl:inline">{opt.label.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Shopping Cart Button */}
+            <button
+              type="button"
+              onClick={onOpenCart}
+              aria-label="Open Shopping Cart"
+              className="ss-glass-btn relative inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
+            >
+              <ShoppingCart className="w-4 h-4 text-cyan-400" />
+              <span className="hidden xl:inline">Cart</span>
+              {cartCount > 0 && (
+                <span
+                  className="keep-white-text ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold text-white"
+                  style={{
+                    backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                  }}
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
             {currentUser ? (
-              <>
+              <div className="flex items-center gap-2">
                 {isStaff ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onOpenOwnerStudio();
+                    onClick={onOpenAdminPanel}
+                    className="keep-white-text ss-cta-btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-md"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                     }}
-                    className="ss-glass-btn w-full rounded-xl py-2.5 text-center text-sm font-bold text-cyan-400"
                   >
-                    {currentUser.role === 'owner' ? 'Open Owner CMS' : 'Open Sub-Admin Portal'}
+                    {currentUser.role === 'owner' ? (
+                      <Crown className="w-3.5 h-3.5" />
+                    ) : (
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {currentUser.role === 'owner' ? 'Owner Dashboard' : 'Sub-Admin Portal'}
+                    </span>
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onOpenPortal();
-                    }}
-                    className="ss-glass-btn w-full rounded-xl py-2.5 text-center text-sm font-semibold"
+                    onClick={onOpenClientPortal}
+                    className="ss-glass-btn inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white"
                   >
-                    Open Client Portal
+                    <LayoutDashboard className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="max-w-[115px] truncate">{currentUser.displayName}</span>
                   </button>
                 )}
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onLogout();
-                  }}
-                  className="ss-glass-btn w-full rounded-xl py-2 text-center text-xs text-rose-400"
+                  onClick={onLogout}
+                  title="Sign out"
+                  aria-label="Sign out"
+                  className="ss-glass-btn p-2 rounded-xl text-slate-300 hover:text-rose-400"
                 >
-                  Sign Out
+                  <LogOut className="w-4 h-4" />
                 </button>
-              </>
+              </div>
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenAuth();
-                }}
-                className="keep-white-text ss-cta-btn w-full rounded-xl py-2.5 text-center text-sm font-bold shadow"
+                onClick={() => onOpenAuth('login')}
+                className="keep-white-text ss-cta-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white shadow-lg"
                 style={{
                   backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
               >
-                Sign In / Continue with Google
+                <UserIcon className="w-3.5 h-3.5" />
+                <span>Sign In</span>
               </button>
             )}
           </div>
+
+          {/* Compact Bar Controls (Mobile View OR Smaller Screens) */}
+          <div className="ss-mobile-nav-only flex lg:hidden items-center gap-1.5">
+            {/* Quick Anytime View Toggle right in the mobile header bar too! */}
+            <button
+              type="button"
+              onClick={() => onToggleViewMode(nextViewMode)}
+              title={`Switch to ${nextViewMode === 'desktop' ? 'Desktop View' : 'Mobile View'}`}
+              aria-label="Toggle Desktop or Mobile View"
+              className="ss-glass-btn inline-flex items-center gap-1 px-2.5 py-2 rounded-xl text-[11px] font-bold text-cyan-300"
+            >
+              {viewMode === 'desktop' ? (
+                <>
+                  <Monitor className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Desktop</span>
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Mobile</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenCart}
+              aria-label="Open Cart"
+              className="ss-glass-btn relative p-2 rounded-xl text-slate-200"
+            >
+              <ShoppingCart className="w-4 h-4 text-cyan-400" />
+              {cartCount > 0 && (
+                <span className="keep-white-text absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-500 text-[10px] font-bold text-white flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle Menu"
+              className="ss-glass-btn p-2 rounded-xl text-slate-200"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Expandable Glass Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="mt-4 pt-4 border-t border-white/15 flex flex-col gap-3">
+            {/* View Mode Toggle Row */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleViewMode('desktop');
+                  setMobileMenuOpen(false);
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border ${
+                  viewMode === 'desktop'
+                    ? 'keep-white-text text-white border-transparent shadow'
+                    : 'border-white/20 text-slate-300'
+                }`}
+                style={
+                  viewMode === 'desktop'
+                    ? {
+                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                      }
+                    : undefined
+                }
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Desktop View</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleViewMode('mobile');
+                  setMobileMenuOpen(false);
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border ${
+                  viewMode === 'mobile'
+                    ? 'keep-white-text text-white border-transparent shadow'
+                    : 'border-white/20 text-slate-300'
+                }`}
+                style={
+                  viewMode === 'mobile'
+                    ? {
+                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                      }
+                    : undefined
+                }
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Mobile View</span>
+              </button>
+            </div>
+
+            {/* Theme Mode Switcher Row */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {THEME_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                const active = themeMode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onChangeThemeMode(opt.id)}
+                    className={`flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold border ${
+                      active
+                        ? 'keep-white-text text-white border-transparent'
+                        : 'border-white/15 text-slate-300'
+                    }`}
+                    style={
+                      active
+                        ? {
+                            backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{opt.label.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/10 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+
+            <div className="pt-2 border-t border-white/15 flex flex-col gap-2">
+              {currentUser ? (
+                <>
+                  {isStaff ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onOpenAdminPanel();
+                      }}
+                      className="keep-white-text w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                      style={{
+                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                      }}
+                    >
+                      <Crown className="w-4 h-4" />
+                      <span>
+                        {currentUser.role === 'owner'
+                          ? 'Open Owner Dashboard'
+                          : 'Open Sub-Admin Portal'}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onOpenClientPortal();
+                      }}
+                      className="ss-glass-btn w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-cyan-400" />
+                      <span>My Client Portal ({currentUser.displayName})</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full py-2 px-4 rounded-xl text-sm font-medium text-rose-400 border border-rose-500/30 hover:bg-rose-500/10"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenAuth('login');
+                  }}
+                  className="keep-white-text w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white"
+                  style={{
+                    backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                  }}
+                >
+                  Login / Sign Up
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </nav>
     </header>
   );
 };

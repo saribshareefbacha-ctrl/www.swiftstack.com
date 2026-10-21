@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Crown, Monitor, ShieldCheck, ShoppingCart, Smartphone } from 'lucide-react';
 import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from './data/defaultSeed';
 import {
   CartItem,
@@ -7,16 +8,25 @@ import {
   SiteCMSData,
   ThemeMode,
   UserProfile,
+  ViewLayoutMode,
   VoiceEngineConfig,
 } from './types/cms';
 import {
   api,
+  CloudSyncState,
   getSavedCart,
   getSavedThemeMode,
   saveCart,
   saveThemeMode,
+  subscribeSyncState,
 } from './utils/api';
-import { syncDocumentBranding } from './utils/branding';
+import {
+  applyViewModeToDocument,
+  detectNaturalDeviceMode,
+  getSavedViewMode,
+  hasSavedViewMode,
+  saveViewMode,
+} from './utils/viewMode';
 import { FuturisticRobotCanvas } from './components/FuturisticRobotCanvas';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
@@ -25,292 +35,505 @@ import { ProjectsSection } from './components/ProjectsSection';
 import { ContactQuoteSection } from './components/ContactQuoteSection';
 import { AuthModal } from './components/AuthModal';
 import { ClientPortalModal } from './components/ClientPortalModal';
-import { AdminCustomizationPanel, AdminTab } from './components/AdminCustomizationPanel';
+import { AdminCustomizationPanel } from './components/AdminCustomizationPanel';
+import { SwiftStackLogo } from './components/SwiftStackLogo';
+import { ViewModeSelectorModal } from './components/ViewModeSelectorModal';
+import { GlassToastViewport, pushToast } from './components/GlassUI';
+import { syncDocumentBranding } from './utils/branding';
 
 export function App() {
-  const [cmsData, setCmsData] = useState<SiteCMSData>(DEFAULT_CMS_DATA);
-  const [orders, setOrders] = useState<InquiryItem[]>(INITIAL_SAMPLE_INQUIRIES);
-  const [cart, setCart] = useState<CartItem[]>(() => getSavedCart());
+  const [cmsData, setCmsData] = useState<SiteCMSData>(() => structuredClone(DEFAULT_CMS_DATA));
+  const [inquiries, setInquiries] = useState<InquiryItem[]>(() =>
+    structuredClone(INITIAL_SAMPLE_INQUIRIES)
+  );
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => getSavedThemeMode() || DEFAULT_CMS_DATA.theme.defaultMode || 'glass'
   );
+  const [viewMode, setViewMode] = useState<ViewLayoutMode>(
+    () => getSavedViewMode() || detectNaturalDeviceMode()
+  );
+  const [showViewModePrompt, setShowViewModePrompt] = useState<boolean>(
+    () => !hasSavedViewMode()
+  );
+  const [cart, setCart] = useState<CartItem[]>(() => getSavedCart());
+  const [, setSyncState] = useState<CloudSyncState>('connecting');
+
+  // Interactive Modal States
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [clientPortalOpen, setClientPortalOpen] = useState(false);
-  const [clientPortalTab, setClientPortalTab] = useState<
-    'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile'
-  >('orders');
-  const [ownerStudioOpen, setOwnerStudioOpen] = useState(false);
-  const [ownerStudioTab, setOwnerStudioTab] = useState<AdminTab>('branding');
-  const [selectedServiceForQuote, setSelectedServiceForQuote] = useState('');
+  const [authInitialTab, setAuthInitialTab] = useState<'login' | 'register'>('login');
+  const [portalOpen, setPortalOpen] = useState(false);
+  const [portalInitialTab, setPortalInitialTab] = useState<'cart' | 'orders' | 'new' | 'profile'>(
+    'cart'
+  );
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  const [preselectedService, setPreselectedService] = useState<string>(
+    DEFAULT_CMS_DATA.services[0]?.title || ''
+  );
 
-  // Sync theme mode to <html data-theme="...">
+  // Real-time Firebase Subscriptions (CMS + Orders + Persistent Auth + Dual-Gmail Owner Auto-Unlock)
   useEffect(() => {
-    saveThemeMode(themeMode);
-  }, [themeMode]);
-
-  // Persist shopping cart
-  useEffect(() => {
-    saveCart(cart);
-  }, [cart]);
-
-  // Live update browser <title>, <meta name="description"> & glowing Favicon
-  useEffect(() => {
-    syncDocumentBranding(cmsData.branding, cmsData.theme);
-  }, [cmsData.branding, cmsData.theme]);
-
-  // Real-time Firebase Cloud Subscriptions
-  useEffect(() => {
+    const unsubSync = subscribeSyncState(setSyncState);
     const unsubCMS = api.subscribeCMS((liveCMS) => {
       setCmsData(liveCMS);
       if (!getSavedThemeMode() && liveCMS.theme?.defaultMode) {
         setThemeMode(liveCMS.theme.defaultMode);
+        document.documentElement.setAttribute('data-theme', liveCMS.theme.defaultMode);
       }
     });
     const unsubOrders = api.subscribeOrders((liveOrders) => {
-      setOrders(liveOrders);
+      setInquiries(liveOrders);
     });
-    const unsubAuth = api.subscribeAuth((user) => {
+    const unsubAuth = api.subscribeAuth((user, fromOAuthRedirect) => {
       setCurrentUser(user);
+      if (fromOAuthRedirect && user && (user.role === 'owner' || user.role === 'subadmin')) {
+        setAdminPanelOpen(true);
+        pushToast(
+          'Master Owner Recognized via Google',
+          `Welcome ${user.displayName} (${user.email}). Owner Admin Dashboard unlocked!`,
+          'success'
+        );
+      }
     });
 
     return () => {
+      unsubSync();
       unsubCMS();
       unsubOrders();
       unsubAuth();
     };
   }, []);
 
-  const totalCartItems = useMemo(
-    () => cart.reduce((sum, item) => sum + item.quantity, 0),
-    [cart]
-  );
+  // Apply Active Sheesha Glass / Crystal / Obsidian / Cyber Theme Mode & Live Branding Meta
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', themeMode);
+    syncDocumentBranding(cmsData.branding, cmsData.theme);
+  }, [themeMode, cmsData.branding, cmsData.theme]);
 
-  const activeClientOrdersCount = useMemo(() => {
-    if (!currentUser || currentUser.role !== 'client') return 0;
-    const emailClean = (currentUser.email || '').toLowerCase();
-    return orders.filter(
-      (o) =>
-        o.clientId === currentUser.id ||
-        (emailClean && o.clientEmail.toLowerCase() === emailClean)
-    ).length;
-  }, [orders, currentUser]);
+  // Apply Dynamic Desktop / Mobile Viewport & Layout Orientation
+  useEffect(() => {
+    applyViewModeToDocument(viewMode);
+  }, [viewMode]);
 
-  const handleAddToCart = (service: ServiceItem) => {
-    setCart((prev) => {
-      const exists = prev.find((i) => i.serviceId === service.id);
-      if (exists) {
-        return prev.map((i) =>
-          i.serviceId === service.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [
-        ...prev,
-        {
-          serviceId: service.id,
-          title: service.title,
-          category: service.category,
-          priceLabel: service.priceLabel,
-          basePriceUsd: service.basePriceUsd,
-          turnaround: service.turnaround,
-          quantity: 1,
-        },
-      ];
-    });
-  };
-
-  const handleUpdateCartQty = (serviceId: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((i) => (i.serviceId === serviceId ? { ...i, quantity: i.quantity + delta } : i))
-        .filter((i) => i.quantity > 0)
+  const handleSelectViewMode = (mode: ViewLayoutMode) => {
+    setViewMode(mode);
+    saveViewMode(mode);
+    setShowViewModePrompt(false);
+    pushToast(
+      mode === 'desktop' ? 'Desktop View Activated' : 'Mobile View Activated',
+      'Preference saved! You can switch views anytime from the top header.',
+      'success'
     );
   };
 
-  const handleClearCart = () => setCart([]);
+  const handleChangeThemeMode = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    saveThemeMode(mode);
+    const names: Record<ThemeMode, string> = {
+      glass: 'Pure Sheesha Glass',
+      light: 'Crystal Light',
+      dark: 'Obsidian Dark',
+      cyber: 'Cyber Neon',
+    };
+    pushToast(`Theme: ${names[mode]}`, 'Visual refraction & contrast updated live.', 'info');
+  };
 
-  const handleVoiceConfigChange = (nextVoice: VoiceEngineConfig) => {
-    setCmsData((prev) => ({ ...prev, voice: nextVoice }));
-    if (currentUser?.role === 'owner') {
-      api.updateVoice(nextVoice).catch(() => {});
+  // Shopping Cart Operations with Pure Sheesha Toast Notifications
+  const handleAddToCart = (service: ServiceItem) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.serviceId === service.id);
+      const next = existing
+        ? prev.map((i) => (i.serviceId === service.id ? { ...i, quantity: i.quantity + 1 } : i))
+        : [
+            ...prev,
+            {
+              serviceId: service.id,
+              title: service.title,
+              category: service.category,
+              priceLabel: service.priceLabel,
+              basePriceUsd: service.basePriceUsd,
+              quantity: 1,
+            },
+          ];
+      saveCart(next);
+      return next;
+    });
+    pushToast('Added to Shopping Cart', `${service.title} (${service.priceLabel})`, 'success');
+  };
+
+  const handleUpdateCartQty = (serviceId: string, delta: number) => {
+    setCart((prev) => {
+      const next = prev
+        .map((item) =>
+          item.serviceId === serviceId ? { ...item, quantity: item.quantity + delta } : item
+        )
+        .filter((item) => item.quantity > 0);
+      saveCart(next);
+      return next;
+    });
+  };
+
+  const handleRemoveCartItem = (serviceId: string) => {
+    setCart((prev) => {
+      const next = prev.filter((item) => item.serviceId !== serviceId);
+      saveCart(next);
+      return next;
+    });
+    pushToast('Item Removed', 'Updated your SwiftStack shopping cart.', 'info');
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+    saveCart([]);
+  };
+
+  const handleVoiceQuickChange = (patch: Partial<VoiceEngineConfig>) => {
+    setCmsData((prev) => {
+      const updatedVoice = { ...prev.voice, ...patch };
+      if (currentUser?.role === 'owner' || currentUser?.role === 'subadmin') {
+        api.updateVoice(updatedVoice).catch(() => {});
+      }
+      return { ...prev, voice: updatedVoice };
+    });
+  };
+
+  const refreshCMS = useCallback(async () => {
+    // Real-time Firestore listener updates state automatically
+  }, []);
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const openOwnerTab = (tab: AdminTab) => {
-    setOwnerStudioTab(tab);
-    setOwnerStudioOpen(true);
-  };
-
-  const scrollToSection = (selector: string) => {
-    const el = document.querySelector(selector);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleOpenCart = () => {
-    if (currentUser && currentUser.role === 'client') {
-      setClientPortalTab('cart');
-      setClientPortalOpen(true);
-    } else {
-      scrollToSection('#order');
-    }
-  };
-
-  const handleAuthenticated = (user: UserProfile) => {
-    setCurrentUser(user);
-    if (user.role === 'owner') {
-      openOwnerTab('branding');
-    } else if (user.role === 'subadmin') {
-      openOwnerTab('services');
-    } else {
-      setClientPortalTab(cart.length > 0 ? 'cart' : 'orders');
-      setClientPortalOpen(true);
-    }
+  const handleSelectServiceForOrder = (serviceTitle: string) => {
+    setPreselectedService(serviceTitle);
+    scrollToSection('order');
   };
 
   const handleLogout = async () => {
     await api.logout();
     setCurrentUser(null);
-    setOwnerStudioOpen(false);
-    setClientPortalOpen(false);
+    setAdminPanelOpen(false);
+    setPortalOpen(false);
+    pushToast('Signed Out', 'Your SwiftStack session has been closed safely.', 'info');
   };
 
-  const handleSelectServiceForOrder = (serviceTitle: string) => {
-    setSelectedServiceForQuote(serviceTitle);
-    scrollToSection('#order');
-  };
-
-  const isOwner = currentUser?.role === 'owner';
-  const isStaff = isOwner || currentUser?.role === 'subadmin';
+  const totalCartItems = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const isStaff = currentUser?.role === 'owner' || currentUser?.role === 'subadmin';
+  const nextViewMode: ViewLayoutMode = viewMode === 'desktop' ? 'mobile' : 'desktop';
 
   return (
-    <div className="relative min-h-screen overflow-x-clip selection:bg-cyan-500/25">
-      {/* Interactive Futuristic Background Robot Canvas + Human/Robot Index Finger Touch Ripple */}
+    <div className="relative min-h-screen overflow-x-hidden selection:bg-cyan-400 selection:text-slate-950">
+      {/* Futuristic Interactive Robot & Human-Robot Finger Touch Energy Ripple Canvas */}
       <FuturisticRobotCanvas
         themeMode={themeMode}
-        primaryHex={cmsData.theme.primaryAccent}
-        secondaryHex={cmsData.theme.secondaryAccent}
-        accentHex={cmsData.theme.tertiaryAccent}
-        robotDensity={cmsData.theme.robotDensity}
-        rippleIntensity={cmsData.theme.rippleIntensity}
+        primaryHex={cmsData.theme.primaryColor}
+        secondaryHex={cmsData.theme.secondaryColor}
+        accentHex={cmsData.theme.accentColor}
       />
 
-      {/* Pure Transparent Frosted Glass Navbar */}
+      {/* Global Pure-Sheesha Glassmorphic Toast Notification Viewport */}
+      <GlassToastViewport />
+
+      {/* First-Visit Preferred View / Orientation Selector Modal */}
+      <ViewModeSelectorModal
+        isOpen={showViewModePrompt}
+        recommendedMode={detectNaturalDeviceMode()}
+        primaryColor={cmsData.theme.primaryColor}
+        secondaryColor={cmsData.theme.secondaryColor}
+        companyName={cmsData.branding.companyName}
+        monogram={cmsData.branding.monogram}
+        profileIconUrl={cmsData.branding.profileIconUrl}
+        onSelectMode={handleSelectViewMode}
+      />
+
+      {/* Top Pure Transparent Sheesha Navigation Bar */}
       <Navbar
-        primaryColor={cmsData.theme.primaryAccent}
-        secondaryColor={cmsData.theme.secondaryAccent}
-        companyName={cmsData.hero.companyName}
-        monogram={cmsData.branding.faviconMonogram || cmsData.hero.companyAbbreviation}
+        currentUser={currentUser}
+        primaryColor={cmsData.theme.primaryColor}
+        secondaryColor={cmsData.theme.secondaryColor}
+        companyName={cmsData.branding.companyName}
+        monogram={cmsData.branding.monogram}
         profileIconUrl={cmsData.branding.profileIconUrl}
         themeMode={themeMode}
-        onChangeThemeMode={setThemeMode}
+        viewMode={viewMode}
         cartCount={totalCartItems}
-        onOpenCart={handleOpenCart}
-        currentUser={currentUser}
-        activeOrdersCount={activeClientOrdersCount}
-        onOpenAuth={() => setAuthModalOpen(true)}
-        onOpenPortal={() => {
-          setClientPortalTab('orders');
-          setClientPortalOpen(true);
+        onChangeThemeMode={handleChangeThemeMode}
+        onToggleViewMode={handleSelectViewMode}
+        onOpenAuth={(tab = 'login') => {
+          setAuthInitialTab(tab);
+          setAuthModalOpen(true);
         }}
-        onOpenOwnerStudio={() => openOwnerTab(isOwner ? 'branding' : 'services')}
+        onOpenAdminPanel={() => setAdminPanelOpen(true)}
+        onOpenClientPortal={() => {
+          setPortalInitialTab('orders');
+          setPortalOpen(true);
+        }}
+        onOpenCart={() => {
+          setPortalInitialTab('cart');
+          setPortalOpen(true);
+        }}
         onLogout={handleLogout}
       />
 
-      {/* Main Content Flow (Strictly Zero 3D/2D Characters Anywhere) */}
-      <main className="relative z-10">
-        <HeroSection
-          hero={cmsData.hero}
-          voiceConfig={cmsData.voice}
-          primaryColor={cmsData.theme.primaryAccent}
-          secondaryColor={cmsData.theme.secondaryAccent}
-          isOwner={isOwner}
-          onVoiceConfigChange={handleVoiceConfigChange}
-          onExploreWork={() => scrollToSection('#projects')}
-          onStartOrder={() => scrollToSection('#services')}
-          onOpenVoiceCMS={() => openOwnerTab('voice')}
-        />
+      {/* Dynamic Desktop / Mobile Responsive Shell */}
+      <div className="ss-viewport-shell relative z-10">
+        <main>
+          <HeroSection
+            hero={cmsData.hero}
+            theme={cmsData.theme}
+            voice={cmsData.voice}
+            onVoiceQuickChange={handleVoiceQuickChange}
+            onExploreServices={() => scrollToSection('services')}
+            onStartOrder={() => scrollToSection('order')}
+          />
 
-        <ServicesSection
-          services={cmsData.services}
-          theme={cmsData.theme}
-          cart={cart}
-          headingPrefix={cmsData.hero.servicesHeadingPrefix}
-          headingHighlight={cmsData.hero.servicesHeadingHighlight}
-          subheading={cmsData.hero.servicesSubheading}
-          isOwner={isStaff}
-          onAddToCart={handleAddToCart}
-          onSelectServiceForQuote={handleSelectServiceForOrder}
-          onManageServices={() => openOwnerTab('services')}
-        />
+          <ServicesSection
+            services={cmsData.services}
+            cart={cart}
+            theme={cmsData.theme}
+            onSelectService={handleSelectServiceForOrder}
+            onAddToCart={handleAddToCart}
+          />
 
-        <ProjectsSection
-          projects={cmsData.projects}
-          theme={cmsData.theme}
-          headingPrefix={cmsData.hero.projectsHeadingPrefix}
-          headingHighlight={cmsData.hero.projectsHeadingHighlight}
-          subheading={cmsData.hero.projectsSubheading}
-          isOwner={isStaff}
-          onManageProjects={() => openOwnerTab('projects')}
-          onStartSimilarProject={(projectTitle) =>
-            handleSelectServiceForOrder(`Similar to: ${projectTitle}`)
-          }
-        />
+          <ProjectsSection
+            projects={cmsData.projects}
+            theme={cmsData.theme}
+            onStartSimilarProject={handleSelectServiceForOrder}
+          />
 
-        <ContactQuoteSection
-          hero={cmsData.hero}
-          theme={cmsData.theme}
-          services={cmsData.services}
-          cart={cart}
-          onUpdateCartQty={handleUpdateCartQty}
-          onClearCart={handleClearCart}
-          preselectedService={selectedServiceForQuote}
-          currentUser={currentUser}
-        />
-      </main>
+          <ContactQuoteSection
+            services={cmsData.services}
+            branding={cmsData.branding}
+            theme={cmsData.theme}
+            currentUser={currentUser}
+            cart={cart}
+            preselectedService={preselectedService}
+            onInquiryCreated={refreshCMS}
+            onClearCart={handleClearCart}
+            onOpenAuth={(tab = 'login') => {
+              setAuthInitialTab(tab);
+              setAuthModalOpen(true);
+            }}
+            onOpenClientPortal={() => {
+              setPortalInitialTab('orders');
+              setPortalOpen(true);
+            }}
+            onOpenCart={() => {
+              setPortalInitialTab('cart');
+              setPortalOpen(true);
+            }}
+          />
+        </main>
 
-      {/* Frictionless Direct Google Login + Unified Sign-In Modal */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onAuthenticated={handleAuthenticated}
-        primaryColor={cmsData.theme.primaryAccent}
-        secondaryColor={cmsData.theme.secondaryAccent}
-        companyName={cmsData.hero.companyName}
-        monogram={cmsData.branding.faviconMonogram || cmsData.hero.companyAbbreviation}
-        profileIconUrl={cmsData.branding.profileIconUrl}
-      />
+        {/* Pure Transparent Sheesha Footer */}
+        <footer className="relative z-10 border-t border-white/15 py-12 backdrop-blur-2xl">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="ss-responsive-grid grid grid-cols-1 md:grid-cols-12 gap-8 pb-8 border-b border-white/15">
+              <div className="ss-hero-col md:col-span-5 space-y-3">
+                <SwiftStackLogo
+                  primaryColor={cmsData.theme.primaryColor}
+                  secondaryColor={cmsData.theme.secondaryColor}
+                  companyName={cmsData.branding.companyName}
+                  monogram={cmsData.branding.monogram}
+                  profileIconUrl={cmsData.branding.profileIconUrl}
+                />
+                <p className="text-sm text-slate-300 max-w-md leading-relaxed">
+                  {cmsData.branding.footerTagline}
+                </p>
+                <p className="text-xs font-mono text-cyan-400">
+                  Founded &amp; Owned by {cmsData.branding.founderName}
+                </p>
+              </div>
 
-      {/* Pure Frosted Glass Shopping & Client Portal */}
-      {currentUser && currentUser.role === 'client' && (
-        <ClientPortalModal
-          isOpen={clientPortalOpen}
-          initialTab={clientPortalTab}
-          onClose={() => setClientPortalOpen(false)}
-          user={currentUser}
-          cart={cart}
-          onAddToCart={handleAddToCart}
-          onUpdateCartQty={handleUpdateCartQty}
-          onClearCart={handleClearCart}
-          services={cmsData.services}
-          projects={cmsData.projects}
-          allOrders={orders}
-          onUserUpdated={setCurrentUser}
-          primaryColor={cmsData.theme.primaryAccent}
-          secondaryColor={cmsData.theme.secondaryAccent}
-        />
+              <div className="ss-hero-col md:col-span-3 space-y-2.5">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
+                  Navigation
+                </h3>
+                <ul className="space-y-2 text-sm text-slate-300">
+                  <li>
+                    <a href="#hero" className="hover:text-cyan-400 transition-colors">
+                      Dynamic Voice Intro
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#services" className="hover:text-cyan-400 transition-colors">
+                      Services &amp; Shopping
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#projects" className="hover:text-cyan-400 transition-colors">
+                      Portfolio Showcase
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#order" className="hover:text-cyan-400 transition-colors">
+                      Request Custom Quote
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="ss-hero-col md:col-span-4 space-y-2.5">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-slate-300 font-bold">
+                  Portal &amp; View Controls
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Switch between Desktop View and Mobile View, track orders, or sign in with Google.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectViewMode(nextViewMode)}
+                    className="ss-glass-btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-cyan-300"
+                  >
+                    {viewMode === 'desktop' ? (
+                      <>
+                        <Smartphone className="w-3.5 h-3.5" />
+                        <span>Switch to Mobile View</span>
+                      </>
+                    ) : (
+                      <>
+                        <Monitor className="w-3.5 h-3.5" />
+                        <span>Switch to Desktop View</span>
+                      </>
+                    )}
+                  </button>
+
+                  {isStaff ? (
+                    <button
+                      type="button"
+                      onClick={() => setAdminPanelOpen(true)}
+                      className="keep-white-text px-4 py-2 rounded-xl text-xs font-bold text-white shadow"
+                      style={{
+                        backgroundImage: `linear-gradient(135deg, ${cmsData.theme.primaryColor}, ${cmsData.theme.secondaryColor})`,
+                      }}
+                    >
+                      {currentUser?.role === 'owner' ? 'Owner Dashboard' : 'Sub-Admin Portal'}
+                    </button>
+                  ) : currentUser ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPortalInitialTab('orders');
+                        setPortalOpen(true);
+                      }}
+                      className="ss-glass-btn px-4 py-2 rounded-xl text-xs font-semibold text-white"
+                    >
+                      Open My Client Portal
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthInitialTab('login');
+                        setAuthModalOpen(true);
+                      }}
+                      className="ss-glass-btn px-4 py-2 rounded-xl text-xs font-semibold text-white"
+                    >
+                      Login / Sign Up
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+              <span>{cmsData.branding.copyrightText}</span>
+              <span>SwiftStack (SS) · Pure Sheesha Glass Edition</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      {/* Floating Bottom-Right Shopping Cart Pill */}
+      {totalCartItems > 0 && !portalOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            setPortalInitialTab('cart');
+            setPortalOpen(true);
+          }}
+          className="keep-white-text ss-cta-btn fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-white shadow-2xl"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${cmsData.theme.primaryColor}, ${cmsData.theme.secondaryColor})`,
+          }}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span>Checkout Cart ({totalCartItems})</span>
+        </button>
       )}
 
-      {/* Multi-Tier Master Owner & Sub-Admin CMS Panel */}
-      {currentUser && isStaff && (
+      {/* Floating Bottom-Left Owner / Sub-Admin Quick Dashboard Pill */}
+      {isStaff && !adminPanelOpen && (
+        <button
+          type="button"
+          onClick={() => setAdminPanelOpen(true)}
+          className="keep-white-text ss-cta-btn fixed bottom-5 left-5 z-40 inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-white shadow-2xl"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${cmsData.theme.primaryColor}, ${cmsData.theme.secondaryColor})`,
+          }}
+        >
+          {currentUser?.role === 'owner' ? (
+            <Crown className="w-4 h-4" />
+          ) : (
+            <ShieldCheck className="w-4 h-4" />
+          )}
+          <span>{currentUser?.role === 'owner' ? 'Owner Dashboard' : 'Sub-Admin Portal'}</span>
+        </button>
+      )}
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialTab={authInitialTab}
+        primaryColor={cmsData.theme.primaryColor}
+        secondaryColor={cmsData.theme.secondaryColor}
+        companyName={cmsData.branding.companyName}
+        monogram={cmsData.branding.monogram}
+        profileIconUrl={cmsData.branding.profileIconUrl}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthenticated={(user, openDashboardIfStaff) => {
+          setCurrentUser(user);
+          if (openDashboardIfStaff && (user.role === 'owner' || user.role === 'subadmin')) {
+            setAdminPanelOpen(true);
+          }
+        }}
+      />
+
+      {/* Shopping Cart & Client Portal Modal */}
+      <ClientPortalModal
+        isOpen={portalOpen}
+        initialTab={portalInitialTab}
+        user={currentUser}
+        services={cmsData.services}
+        inquiries={inquiries}
+        cart={cart}
+        theme={cmsData.theme}
+        onClose={() => setPortalOpen(false)}
+        onOpenAuth={(tab = 'login') => {
+          setAuthInitialTab(tab);
+          setAuthModalOpen(true);
+        }}
+        onUpdateCartQty={handleUpdateCartQty}
+        onRemoveCartItem={handleRemoveCartItem}
+        onClearCart={handleClearCart}
+        onAddServiceToCart={handleAddToCart}
+        onUserUpdated={(updated) => setCurrentUser(updated)}
+      />
+
+      {/* Owner & Scoped Sub-Admin CMS Panel */}
+      {isStaff && currentUser && (
         <AdminCustomizationPanel
-          isOpen={ownerStudioOpen}
-          initialTab={ownerStudioTab}
+          isOpen={adminPanelOpen}
           currentUser={currentUser}
-          onClose={() => setOwnerStudioOpen(false)}
           cmsData={cmsData}
-          orders={orders}
-          onCMSUpdated={setCmsData}
-          onChangeThemeMode={setThemeMode}
+          inquiries={inquiries}
+          onClose={() => setAdminPanelOpen(false)}
+          onRefreshCMS={refreshCMS}
         />
       )}
     </div>

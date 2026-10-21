@@ -2,9 +2,8 @@ import { VoiceEngineConfig, VoiceGender } from '../types/cms';
 
 /**
  * Authentic Pakistani / South Asian English Phonetic Lexicon
- * Preserves soft dental aspirated consonants ('dh' in Randhawa -> 'Run-dhaa-waa')
- * and open South Asian vowels without American retroflex/flapping artifacts,
- * while maintaining exact 1-to-1 word index mapping for real-time visual highlighting.
+ * Ensures "Randhawa" is pronounced naturally with a soft dental 'dh' ('Run-dhaa-waa')
+ * matching Pakistani English phonetics rather than flat American retroflex vowels.
  */
 const PAKISTANI_PHONETIC_LEXICON: Record<string, string> = {
   randhawa: 'Run-dhaa-waa',
@@ -43,7 +42,6 @@ function transformTokenForPakistaniEnglish(
   if (token === '&') return 'and';
   if (token === '—' || token === '–') return ',';
 
-  // Extract leading punctuation, core word, and trailing punctuation
   const match = token.match(/^([^\w@]*)([\w@'-]+)([^\w]*)$/);
   if (!match) return token;
 
@@ -51,7 +49,6 @@ function transformTokenForPakistaniEnglish(
   const lower = core.toLowerCase();
 
   if (enablePhonetics && PAKISTANI_PHONETIC_LEXICON[lower]) {
-    // Even on native South Asian voices, "Run-dhaa-waa" and "Saa-rib" ensure crystal-clear dental 'dh' & open 'aa'
     if (isNativePkVoice && lower === 'muhammad') {
       return `${prefix}${core}${suffix}`;
     }
@@ -87,7 +84,7 @@ export function buildPakistaniSpeechMap(
       endChar,
     });
     spokenParts.push(spokenWord);
-    cursor = endChar + 1; // +1 for joining space
+    cursor = endChar + 1;
   });
 
   return {
@@ -95,6 +92,35 @@ export function buildPakistaniSpeechMap(
     spokenText: spokenParts.join(' '),
     spans,
   };
+}
+
+/**
+ * Computes natural syllable + punctuation-aware per-word delay schedule (in ms)
+ * anchored to the Owner's configured `highlightDelayMs` (`180ms` - `900ms` per word)
+ * and scaled inversely by `speechFrequency` so word highlighting NEVER rushes ahead of speech.
+ */
+export function computeCalibratedWordDelays(
+  rawWords: string[],
+  baseDelayMs: number,
+  speechFrequency: number
+): number[] {
+  const clampedBase = Math.min(900, Math.max(180, Number(baseDelayMs) || 460));
+  const rateScale = 0.95 / Math.max(0.65, Math.min(1.4, speechFrequency || 0.95));
+
+  return rawWords.map((word) => {
+    const cleanLen = word.replace(/[^\w]/g, '').length;
+    // Short words ("to", "I", "or") are slightly quicker; multi-syllable words ("infrastructure") hold longer
+    const lengthFactor = Math.max(0.72, Math.min(1.48, 0.66 + cleanLen * 0.068));
+
+    let punctuationPause = 0;
+    if (/[.!?]$/.test(word)) {
+      punctuationPause = 340;
+    } else if (/[,;:—–]$/.test(word)) {
+      punctuationPause = 200;
+    }
+
+    return Math.round((clampedBase * lengthFactor + punctuationPause) * rateScale);
+  });
 }
 
 const MALE_VOICE_KEYWORDS = [
@@ -148,10 +174,6 @@ export function inferVoiceGender(voice: SpeechSynthesisVoice): VoiceGender | 'un
   return 'unknown';
 }
 
-/**
- * Selects the best South Asian / Pakistani English (`en-PK` -> `en-IN` -> Commonwealth `en-GB`)
- * SpeechSynthesisVoice matching the requested Male/Female voice gender, avoiding flat `en-US` defaults.
- */
 export function selectPakistaniEnglishVoice(
   voices: SpeechSynthesisVoice[],
   targetGender: VoiceGender,
@@ -186,32 +208,49 @@ export function selectPakistaniEnglishVoice(
 
     let score = 0;
 
-    // 1. Pakistani & South Asian English Accent Priority
-    if (lang.startsWith('en-pk') || name.includes('pakistan') || name.includes('asad') || name.includes('uzma')) {
+    if (
+      lang.startsWith('en-pk') ||
+      name.includes('pakistan') ||
+      name.includes('asad') ||
+      name.includes('uzma')
+    ) {
       score += 140;
-    } else if (lang.startsWith('en-in') || name.includes('india') || name.includes('rishi') || name.includes('prabhat') || name.includes('neerja') || name.includes('veena')) {
+    } else if (
+      lang.startsWith('en-in') ||
+      name.includes('india') ||
+      name.includes('rishi') ||
+      name.includes('prabhat') ||
+      name.includes('neerja') ||
+      name.includes('veena')
+    ) {
       score += 110;
-    } else if (lang.startsWith('en-gb') || lang.startsWith('en-sg') || lang.startsWith('en-ae') || lang.startsWith('en-ie')) {
-      // Non-rhotic Commonwealth vowel cadence aligns closely with educated Pakistani English
+    } else if (
+      lang.startsWith('en-gb') ||
+      lang.startsWith('en-sg') ||
+      lang.startsWith('en-ae') ||
+      lang.startsWith('en-ie')
+    ) {
       score += 75;
     } else if (lang.startsWith('en-au') || lang.startsWith('en-nz') || lang.startsWith('en-za')) {
       score += 55;
     } else if (lang.startsWith('en-us')) {
-      // Deprioritize American accent whenever Pakistani / South Asian / Commonwealth voices exist
       score += 15;
     } else {
       score += 30;
     }
 
-    // 2. Male / Female Gender Accuracy Priority
     if (detectedGender === targetGender) {
       score += 95;
     } else if (detectedGender !== 'unknown' && detectedGender !== targetGender) {
       score -= 80;
     }
 
-    // 3. Natural / Neural quality bonus
-    if (name.includes('natural') || name.includes('neural') || name.includes('online') || name.includes('google')) {
+    if (
+      name.includes('natural') ||
+      name.includes('neural') ||
+      name.includes('online') ||
+      name.includes('google')
+    ) {
       score += 18;
     }
 
@@ -231,15 +270,11 @@ export function selectPakistaniEnglishVoice(
   };
 }
 
-/**
- * Computes calibrated utterance rate & pitch so Male vs Female selection is
- * unmistakably audible even on systems with only one neutral voice installed.
- */
 export function computeCalibratedVoiceParams(
   config: VoiceEngineConfig,
   matchedGenderNatively: boolean
 ): { rate: number; pitch: number } {
-  const rate = Math.min(1.5, Math.max(0.6, Number(config.speechFrequency) || 0.96));
+  const rate = Math.min(1.5, Math.max(0.6, Number(config.speechFrequency) || 0.95));
   let basePitch = Number(config.voicePitch) || 1.0;
 
   if (!matchedGenderNatively) {
