@@ -21,10 +21,10 @@ export function initializeDatabase(): void {
     );
   `);
 
-  const existing = db.prepare('SELECT id FROM cms_snapshot WHERE id = ?').get('live');
+  const existing = db.prepare('SELECT id FROM cms_snapshot WHERE id = ?').get('live_v4');
   if (!existing) {
     db.prepare('INSERT INTO cms_snapshot (id, payload, updated_at) VALUES (?, ?, ?)').run(
-      'live',
+      'live_v4',
       JSON.stringify(DEFAULT_CMS_DATA),
       new Date().toISOString()
     );
@@ -34,13 +34,14 @@ export function initializeDatabase(): void {
 export function getFullCMSData(): SiteCMSData {
   const row = db
     .prepare('SELECT payload FROM cms_snapshot WHERE id = ?')
-    .get('live') as { payload: string } | undefined;
+    .get('live_v4') as { payload: string } | undefined;
   if (!row) return DEFAULT_CMS_DATA;
   const parsed = JSON.parse(row.payload) as Partial<SiteCMSData>;
   return {
     branding: { ...DEFAULT_CMS_DATA.branding, ...(parsed.branding || {}) },
     hero: { ...DEFAULT_CMS_DATA.hero, ...(parsed.hero || {}) },
-    character: { ...DEFAULT_CMS_DATA.character, ...(parsed.character || {}) },
+    voice: { ...DEFAULT_CMS_DATA.voice, ...(parsed.voice || {}) },
+    theme: { ...DEFAULT_CMS_DATA.theme, ...(parsed.theme || {}) },
     services:
       Array.isArray(parsed.services) && parsed.services.length > 0
         ? parsed.services
@@ -50,13 +51,12 @@ export function getFullCMSData(): SiteCMSData {
         ? parsed.projects
         : DEFAULT_CMS_DATA.projects,
     subAdmins: Array.isArray(parsed.subAdmins) ? parsed.subAdmins : DEFAULT_CMS_DATA.subAdmins,
-    theme: { ...DEFAULT_CMS_DATA.theme, ...(parsed.theme || {}) },
   };
 }
 
 export function saveFullCMSData(data: SiteCMSData): SiteCMSData {
   db.prepare(
     'INSERT INTO cms_snapshot (id, payload, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at'
-  ).run('live', JSON.stringify(data), new Date().toISOString());
+  ).run('live_v4', JSON.stringify(data), new Date().toISOString());
   return data;
 }

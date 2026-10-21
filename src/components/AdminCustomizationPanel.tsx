@@ -1,30 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  X,
-  Save,
-  Plus,
-  Trash2,
-  Edit3,
-  Palette,
-  FileText,
-  Layers,
-  FolderKanban,
-  MessageSquare,
-  ShieldAlert,
-  Sparkles,
-  Upload,
-  RotateCcw,
-  Cloud,
-  Volume2,
   CheckCircle2,
-  Globe,
+  Cloud,
+  Edit3,
   Eye,
   EyeOff,
+  FileText,
+  FolderKanban,
+  Globe,
+  Layers,
+  MessageSquare,
+  Palette,
+  Plus,
+  RotateCcw,
+  Save,
+  ShieldAlert,
+  Trash2,
+  Upload,
+  Volume2,
+  X,
 } from 'lucide-react';
-import { CHARACTER_PRESET_IMAGES } from '../data/defaultSeed';
 import {
-  CharacterConfig,
-  CharacterPresetStyle,
   HeroCMS,
   InquiryItem,
   ProjectItem,
@@ -35,14 +31,21 @@ import {
   ThemeCMS,
   ThemeMode,
   UserProfile,
+  VoiceEngineConfig,
+  VoiceGender,
 } from '../types/cms';
 import { api, CloudSyncState, saveThemeMode, subscribeSyncState } from '../utils/api';
 import { buildGlowingFaviconDataUrl, syncDocumentBranding } from '../utils/branding';
+import {
+  buildPakistaniSpeechMap,
+  computeCalibratedVoiceParams,
+  selectPakistaniEnglishVoice,
+} from '../utils/voiceEngine';
 
 export type AdminTab =
   | 'branding'
   | 'hero'
-  | 'character'
+  | 'voice'
   | 'services'
   | 'projects'
   | 'orders'
@@ -77,7 +80,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
       return [
         'branding',
         'hero',
-        'character',
+        'voice',
         'services',
         'projects',
         'orders',
@@ -102,8 +105,9 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   );
   const [brandingForm, setBrandingForm] = useState<SiteBrandingMeta>(cmsData.branding);
   const [heroForm, setHeroForm] = useState<HeroCMS>(cmsData.hero);
-  const [charForm, setCharForm] = useState<CharacterConfig>(cmsData.character);
+  const [voiceForm, setVoiceForm] = useState<VoiceEngineConfig>(cmsData.voice);
   const [themeForm, setThemeForm] = useState<ThemeCMS>(cmsData.theme);
+  const [systemVoices, setSystemVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [syncStatus, setSyncStatus] = useState<CloudSyncState>('live');
   const [toast, setToast] = useState('');
 
@@ -111,7 +115,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [srvTitle, setSrvTitle] = useState('');
   const [srvCat, setSrvCat] = useState('Engineering');
-  const [srvPrice, setSrvPrice] = useState('From $1,800');
+  const [srvPrice, setSrvPrice] = useState('$1,800');
   const [srvTurnaround, setSrvTurnaround] = useState('1 – 3 Weeks');
   const [srvDesc, setSrvDesc] = useState('');
   const [srvDeliverables, setSrvDeliverables] = useState(
@@ -156,7 +160,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   useEffect(() => {
     setBrandingForm(cmsData.branding);
     setHeroForm(cmsData.hero);
-    setCharForm(cmsData.character);
+    setVoiceForm(cmsData.voice);
     setThemeForm(cmsData.theme);
   }, [cmsData]);
 
@@ -165,22 +169,24 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     return unsub;
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const loadVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) setSystemVoices(v);
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+    };
+  }, []);
+
   if (!isOpen) return null;
 
   const notify = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3200);
-  };
-
-  // Master Branding & Favicon Save
-  const handleSaveBranding = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isMasterOwner) return;
-    await api.updateBranding(brandingForm);
-    const updated = { ...cmsData, branding: brandingForm };
-    onCMSUpdated(updated);
-    syncDocumentBranding(brandingForm, cmsData.theme);
-    notify('Favicon, Profile Icon & Display Meta published live!');
   };
 
   const handleUploadDataUrl = (
@@ -191,35 +197,62 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        cb(reader.result);
-      }
+      if (typeof reader.result === 'string') cb(reader.result);
     };
     reader.readAsDataURL(file);
   };
 
+  // 1. Branding & Meta Save
+  const handleSaveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isMasterOwner) return;
+    await api.updateBranding(brandingForm);
+    onCMSUpdated({ ...cmsData, branding: brandingForm });
+    syncDocumentBranding(brandingForm, cmsData.theme);
+    notify('Favicon, Profile Emblem & Display Meta published live!');
+  };
+
+  // 2. Site Copy & Intro Script Save
   const handleSaveHero = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isMasterOwner) return;
     await api.updateHero(heroForm);
     onCMSUpdated({ ...cmsData, hero: heroForm });
-    notify('All site texts & section headings published live!');
+    notify('Site texts & Executive Intro script published live!');
   };
 
-  const handleSaveCharacter = async (e: React.FormEvent) => {
+  // 3. Pakistani English Voice Engine Save & Test
+  const handleSaveVoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isMasterOwner) return;
-    await api.updateCharacter(charForm);
-    onCMSUpdated({ ...cmsData, character: charForm });
-    notify('CEO Character & Lip-Sync voice settings saved!');
+    await api.updateVoice(voiceForm);
+    onCMSUpdated({ ...cmsData, voice: voiceForm });
+    notify('Pakistani English Voice Engine settings saved live!');
   };
 
   const handleTestVoice = () => {
-    if (!('speechSynthesis' in window)) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(heroForm.voiceGreeting.replace(/\s*&\s*/g, ' and '));
-    u.rate = charForm.voiceRate || 1.0;
-    u.pitch = charForm.voicePitch || 1.02;
+    const chosen = selectPakistaniEnglishVoice(
+      systemVoices.length > 0 ? systemVoices : window.speechSynthesis.getVoices(),
+      voiceForm.voiceGender,
+      voiceForm.preferredVoiceURI
+    );
+    const map = buildPakistaniSpeechMap(
+      heroForm.voiceGreeting,
+      voiceForm.pakistaniAccentPhonetics,
+      chosen.isNativeSouthAsian
+    );
+    const u = new SpeechSynthesisUtterance(map.spokenText);
+    if (chosen.voice) {
+      u.voice = chosen.voice;
+      u.lang = chosen.voice.lang;
+    } else {
+      u.lang = 'en-PK';
+    }
+    const { rate, pitch } = computeCalibratedVoiceParams(voiceForm, chosen.matchedGender);
+    u.rate = rate;
+    u.pitch = pitch;
     window.speechSynthesis.speak(u);
   };
 
@@ -228,7 +261,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     setEditingServiceId(null);
     setSrvTitle('');
     setSrvCat('Engineering');
-    setSrvPrice('From $1,800');
+    setSrvPrice('$1,800');
     setSrvTurnaround('1 – 3 Weeks');
     setSrvDesc('');
     setSrvDeliverables('Custom UI & Full-Stack Build, Cloud Deployment, Post-Launch Support');
@@ -249,10 +282,12 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   const handleSubmitService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!srvTitle.trim()) return;
-    const payload = {
+    const numericPrice = Number(srvPrice.replace(/[^0-9.]/g, '')) || 1000;
+    const payload: Partial<ServiceItem> = {
       title: srvTitle.trim(),
       category: srvCat.trim() || 'Engineering',
-      priceLabel: srvPrice.trim() || 'Custom Quote',
+      priceLabel: srvPrice.trim() || `$${numericPrice.toLocaleString()}`,
+      basePriceUsd: numericPrice,
       turnaround: srvTurnaround.trim() || '1 – 2 Weeks',
       shortDescription: srvDesc.trim(),
       deliverables: srvDeliverables
@@ -269,12 +304,12 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
         services: cmsData.services.map((s) => (s.id === editingServiceId ? res.service : s)),
       });
       resetServiceForm();
-      notify('Service & pricing updated live!');
+      notify('Service & cart price updated live!');
     } else {
       const res = await api.createService(payload);
       onCMSUpdated({ ...cmsData, services: [...cmsData.services, res.service] });
       resetServiceForm();
-      notify('New service published live!');
+      notify('New service package added to storefront!');
     }
   };
 
@@ -317,7 +352,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   const handleSubmitProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!projTitle.trim()) return;
-    const payload = {
+    const payload: Partial<ProjectItem> = {
       title: projTitle.trim(),
       subtitle: projSubtitle || 'Custom SwiftStack Solution',
       category: projCategory,
@@ -356,7 +391,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     notify('Project deleted.');
   };
 
-  // Sub-Admin Authorization Handlers
+  // Sub-Admin CRUD
   const handleCreateSubAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isMasterOwner || !subUsername.trim() || !subPassword) return;
@@ -375,10 +410,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     notify(`Sub-Admin "${res.subAdmin.displayName}" authorized!`);
   };
 
-  const handleToggleSubPermission = async (
-    id: string,
-    key: keyof SubAdminPermissions
-  ) => {
+  const handleToggleSubPermission = async (id: string, key: keyof SubAdminPermissions) => {
     if (!isMasterOwner) return;
     const target = cmsData.subAdmins.find((s) => s.id === id);
     if (!target) return;
@@ -404,7 +436,6 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     notify('Sub-Admin access revoked.');
   };
 
-  // Orders & Theme Handlers
   const handleSaveOrderResponse = async (item: InquiryItem) => {
     const draft = quoteDrafts[item.id] || {
       status: item.status,
@@ -423,7 +454,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     onChangeThemeMode(themeForm.defaultMode);
     onCMSUpdated({ ...cmsData, theme: themeForm });
     syncDocumentBranding(cmsData.branding, themeForm);
-    notify('Default Theme Mode & Brand Palette synced live!');
+    notify('Glass Theme, Colors & Robot Canvas settings saved live!');
   };
 
   const handleResetDefaults = async () => {
@@ -432,7 +463,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     onCMSUpdated(fresh);
     onChangeThemeMode(fresh.theme.defaultMode);
     syncDocumentBranding(fresh.branding, fresh.theme);
-    notify('Restored SwiftStack factory defaults.');
+    notify('Restored SwiftStack V4 factory defaults.');
   };
 
   const allNavItems: {
@@ -442,11 +473,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     badge?: number;
   }[] = [
     { id: 'branding', label: 'Branding, Favicon & Meta', icon: <Globe className="h-4 w-4" /> },
-    { id: 'hero', label: 'Site Copy & Headings', icon: <FileText className="h-4 w-4" /> },
-    { id: 'character', label: 'CEO Character & Lip-Sync', icon: <Sparkles className="h-4 w-4" /> },
+    { id: 'hero', label: 'Site Copy & Intro Script', icon: <FileText className="h-4 w-4" /> },
+    { id: 'voice', label: 'Voice Engine (PK English)', icon: <Volume2 className="h-4 w-4" /> },
     {
       id: 'services',
-      label: 'Services & Pricing',
+      label: 'Services & Storefront',
       icon: <Layers className="h-4 w-4" />,
       badge: cmsData.services.length,
     },
@@ -458,7 +489,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     },
     {
       id: 'orders',
-      label: 'Leads & Orders',
+      label: 'Orders & Cart Leads',
       icon: <MessageSquare className="h-4 w-4" />,
       badge: orders.length,
     },
@@ -468,28 +499,10 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
       icon: <ShieldAlert className="h-4 w-4" />,
       badge: cmsData.subAdmins.length,
     },
-    { id: 'theme', label: 'Multi-Theme & Palette', icon: <Palette className="h-4 w-4" /> },
+    { id: 'theme', label: 'Glass Theme & Robots', icon: <Palette className="h-4 w-4" /> },
   ];
 
   const visibleNavItems = allNavItems.filter((item) => allowedTabs.includes(item.id));
-
-  const presetOptions: { id: CharacterPresetStyle; label: string; desc: string }[] = [
-    {
-      id: 'executive-polo',
-      label: 'Signature White Polo',
-      desc: 'Transparent 3D render with full wave + vowel lip-sync frames',
-    },
-    {
-      id: 'midnight-blazer',
-      label: 'Executive Slate Blazer',
-      desc: 'Transparent 3D blazer render with full lip-sync speaking frames',
-    },
-    {
-      id: 'tech-minimalist',
-      label: 'Minimalist Tech Jacket',
-      desc: 'Transparent 3D tech jacket render with full lip-sync frames',
-    },
-  ];
 
   const previewFaviconSrc =
     brandingForm.faviconUrl && brandingForm.faviconUrl.trim().length > 0
@@ -501,15 +514,15 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
         );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-6 backdrop-blur-md">
-      <div className="ss-modal-surface relative flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-3 sm:p-6 backdrop-blur-md">
+      <div className="ss-modal-surface relative flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl shadow-2xl">
         {/* Top Multi-Tier Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/50 bg-slate-950/80 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-400/25 px-6 py-4">
           <div className="flex items-center gap-3">
             <img
               src={previewFaviconSrc}
               alt="Favicon Preview"
-              className="h-10 w-10 rounded-xl object-contain shadow-md"
+              className="h-10 w-10 rounded-xl object-contain shadow-sm"
             />
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -518,10 +531,10 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     ? 'SwiftStack Master Owner CMS'
                     : `SwiftStack Sub-Admin Portal (${currentUser.displayName})`}
                 </h2>
-                <span className="keep-white-text rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase">
-                  {isMasterOwner ? 'Master Owner' : 'Restricted Sub-Admin'}
+                <span className="keep-white-text rounded-full bg-gradient-to-r from-cyan-600 to-indigo-600 px-2.5 py-0.5 text-[10px] font-bold uppercase">
+                  {isMasterOwner ? 'Master Owner' : 'Sub-Admin'}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-400">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400">
                   <Cloud className="h-3 w-3" />
                   <span>
                     {syncStatus === 'live'
@@ -532,31 +545,31 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               </div>
               <p className="text-xs text-slate-400">
                 {isMasterOwner
-                  ? 'Full authority over site branding, meta tags, CEO character, services, projects & sub-admins'
-                  : 'Authorized role-based workspace — master branding & system controls restricted to Owner'}
+                  ? 'Full authority over site meta, Pakistani English voice engine, services, gallery & sub-admins'
+                  : 'Authorized role workspace — master branding & voice studio restricted to Owner'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
             {toast && (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-300">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-400">
                 <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400" />
-                {toast}
+                <span>{toast}</span>
               </span>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="ss-glass-card rounded-xl border px-3.5 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-400"
+              className="ss-glass-btn rounded-xl px-3.5 py-2 text-xs font-semibold"
             >
               Done / Live Site
             </button>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close Studio"
-              className="ss-glass-card rounded-xl border p-2 text-slate-400 hover:text-white"
+              aria-label="Close CMS"
+              className="ss-glass-btn rounded-xl p-2"
             >
               <X className="h-5 w-5" />
             </button>
@@ -566,7 +579,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
         {/* Workspace Layout */}
         <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
           {/* Sidebar Navigation */}
-          <aside className="flex lg:w-64 shrink-0 overflow-x-auto lg:flex-col gap-1.5 border-b lg:border-b-0 lg:border-r border-slate-700/50 bg-slate-950/50 p-3">
+          <aside className="flex lg:w-64 shrink-0 overflow-x-auto lg:flex-col gap-1.5 border-b lg:border-b-0 lg:border-r border-slate-400/25 p-3">
             {visibleNavItems.map((item) => {
               const active = activeTab === item.id;
               return (
@@ -575,17 +588,22 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={`flex shrink-0 items-center justify-between gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${
-                    active
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                      : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'
+                    active ? 'keep-white-text shadow' : 'text-slate-400 hover:bg-cyan-500/10 hover:text-white'
                   }`}
+                  style={
+                    active
+                      ? {
+                          backgroundImage: `linear-gradient(135deg, ${cmsData.theme.primaryAccent}, ${cmsData.theme.secondaryAccent})`,
+                        }
+                      : undefined
+                  }
                 >
                   <span className="flex items-center gap-2.5">
                     {item.icon}
                     <span>{item.label}</span>
                   </span>
                   {item.badge !== undefined && (
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-200">
+                    <span className="rounded-full bg-black/15 px-2 py-0.5 text-[10px]">
                       {item.badge}
                     </span>
                   )}
@@ -594,11 +612,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
             })}
 
             {isMasterOwner && (
-              <div className="mt-auto hidden lg:block pt-4 border-t border-slate-700/40">
+              <div className="mt-auto hidden lg:block pt-4 border-t border-slate-400/25">
                 <button
                   type="button"
                   onClick={handleResetDefaults}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700/60 py-2.5 text-xs text-slate-400 hover:border-amber-500/40 hover:text-amber-400"
+                  className="ss-glass-btn flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Restore Factory Seed</span>
@@ -609,15 +627,14 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
 
           {/* Main Tab Panel */}
           <div className="flex-1 overflow-y-auto p-6">
-            {/* 1. BRANDING, GLOWING FAVICON, PROFILE ICON & DISPLAY META */}
+            {/* 1. BRANDING, FAVICON & META */}
             {isMasterOwner && activeTab === 'branding' && (
               <form onSubmit={handleSaveBranding} className="max-w-3xl space-y-6">
                 <h3 className="font-display text-xl font-bold text-white">
-                  Favicon, Profile Icons &amp; Dynamic Browser Display Meta
+                  Favicon, Profile Emblem &amp; Dynamic Browser Display Meta
                 </h3>
 
-                {/* Live Browser Tab Preview Bar */}
-                <div className="ss-glass-card flex items-center gap-3 rounded-2xl border p-4">
+                <div className="ss-glass-card flex items-center gap-3 rounded-2xl p-4">
                   <img
                     src={previewFaviconSrc}
                     alt="Tab Icon"
@@ -648,7 +665,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       onChange={(e) =>
                         setBrandingForm({ ...brandingForm, pageTitle: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input w-full rounded-xl px-3.5 py-2.5 text-sm"
                     />
                   </div>
 
@@ -663,14 +680,14 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       onChange={(e) =>
                         setBrandingForm({ ...brandingForm, metaDescription: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 text-sm text-white"
+                      className="ss-glass-input w-full rounded-xl p-3.5 text-sm"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-300">
-                        Glowing Vector Monogram (Default `SS`)
+                        Glowing Monogram (Default `SS`)
                       </label>
                       <input
                         type="text"
@@ -679,15 +696,15 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         onChange={(e) =>
                           setBrandingForm({ ...brandingForm, faviconMonogram: e.target.value })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2.5 text-sm"
                       />
                     </div>
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-300">
-                        Custom Favicon Upload (Optional)
+                        Custom Favicon Upload
                       </label>
-                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs font-semibold text-cyan-300 hover:border-cyan-400">
+                      <label className="ss-glass-btn flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-cyan-400">
                         <Upload className="h-3.5 w-3.5" />
                         <span>Upload Favicon</span>
                         <input
@@ -705,11 +722,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-300">
-                        Header Profile Icon Image (Optional)
+                        Header Profile Emblem Upload
                       </label>
-                      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs font-semibold text-cyan-300 hover:border-cyan-400">
+                      <label className="ss-glass-btn flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-cyan-400">
                         <Upload className="h-3.5 w-3.5" />
-                        <span>Upload Profile Icon</span>
+                        <span>Upload Icon</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -723,51 +740,41 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       </label>
                     </div>
                   </div>
-
-                  {(brandingForm.faviconUrl || brandingForm.profileIconUrl) && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBrandingForm({
-                          ...brandingForm,
-                          faviconUrl: '',
-                          profileIconUrl: '',
-                        })
-                      }
-                      className="text-xs text-rose-400 underline"
-                    >
-                      Revert to Default Glowing "SS" Vector Emblem
-                    </button>
-                  )}
                 </div>
 
                 <button
                   type="submit"
-                  className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-6 py-3 text-sm font-bold shadow"
+                  className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold shadow"
+                  style={{
+                    backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                  }}
                 >
                   <Save className="h-4 w-4" />
-                  <span>Publish Favicon, Icons &amp; Meta Live</span>
+                  <span>Publish Favicon &amp; Meta Live</span>
                 </button>
               </form>
             )}
 
-            {/* 2. ALL SITE TEXTS & SECTION HEADINGS */}
+            {/* 2. SITE COPY & EXECUTIVE INTRO SCRIPT */}
             {isMasterOwner && activeTab === 'hero' && (
               <form onSubmit={handleSaveHero} className="max-w-4xl space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl font-bold text-white">
-                    Hero Copy, CEO Bio, Karaoke Voice Script &amp; Section Headings
+                    Site Copy, Founder Bio &amp; Dynamic Voice Introduction Script
                   </h3>
                   <button
                     type="submit"
-                    className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-xs font-bold"
+                    className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                    }}
                   >
                     <Save className="h-4 w-4" />
                     <span>Publish All Copy</span>
                   </button>
                 </div>
 
-                <div className="ss-glass-card rounded-2xl border p-5 space-y-4">
+                <div className="ss-glass-card rounded-2xl p-5 space-y-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
                       <label className="mb-1 block text-xs text-slate-300">Brand Name</label>
@@ -775,7 +782,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         type="text"
                         value={heroForm.companyName}
                         onChange={(e) => setHeroForm({ ...heroForm, companyName: e.target.value })}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -786,7 +793,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         onChange={(e) =>
                           setHeroForm({ ...heroForm, companyAbbreviation: e.target.value })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -795,7 +802,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         type="text"
                         value={heroForm.badgeText}
                         onChange={(e) => setHeroForm({ ...heroForm, badgeText: e.target.value })}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                   </div>
@@ -809,7 +816,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         onChange={(e) =>
                           setHeroForm({ ...heroForm, headlinePrefix: e.target.value })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -822,7 +829,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         onChange={(e) =>
                           setHeroForm({ ...heroForm, headlineHighlight: e.target.value })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                   </div>
@@ -833,7 +840,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       rows={2}
                       value={heroForm.subheadline}
                       onChange={(e) => setHeroForm({ ...heroForm, subheadline: e.target.value })}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white"
+                      className="ss-glass-input w-full rounded-xl p-3 text-sm"
                     />
                   </div>
 
@@ -844,7 +851,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         type="text"
                         value={heroForm.founderName}
                         onChange={(e) => setHeroForm({ ...heroForm, founderName: e.target.value })}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -852,33 +859,22 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       <input
                         type="text"
                         value={heroForm.founderTitle}
-                        onChange={(e) =>
-                          setHeroForm({ ...heroForm, founderTitle: e.target.value })
-                        }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        onChange={(e) => setHeroForm({ ...heroForm, founderTitle: e.target.value })}
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs text-slate-300">Founder Bio</label>
-                    <textarea
-                      rows={2}
-                      value={heroForm.founderBio}
-                      onChange={(e) => setHeroForm({ ...heroForm, founderBio: e.target.value })}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-cyan-400">
-                      CEO Web Speech API Greeting (Live Word-by-Word Karaoke Highlighting)
+                    <label className="mb-1 block text-xs font-bold text-cyan-400">
+                      Executive Voice Introduction Text (Real-Time Word Highlighting &amp; Pakistani
+                      English Phonetics)
                     </label>
                     <textarea
-                      rows={3}
+                      rows={4}
                       value={heroForm.voiceGreeting}
                       onChange={(e) => setHeroForm({ ...heroForm, voiceGreeting: e.target.value })}
-                      className="w-full rounded-xl border border-cyan-500/40 bg-slate-950 p-3 text-sm text-white"
+                      className="ss-glass-input w-full rounded-xl p-3 text-sm"
                     />
                   </div>
 
@@ -888,10 +884,8 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       <input
                         type="email"
                         value={heroForm.contactEmail}
-                        onChange={(e) =>
-                          setHeroForm({ ...heroForm, contactEmail: e.target.value })
-                        }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        onChange={(e) => setHeroForm({ ...heroForm, contactEmail: e.target.value })}
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -902,7 +896,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         onChange={(e) =>
                           setHeroForm({ ...heroForm, locationLabel: e.target.value })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                     <div>
@@ -910,10 +904,8 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       <input
                         type="text"
                         value={heroForm.socialHandle}
-                        onChange={(e) =>
-                          setHeroForm({ ...heroForm, socialHandle: e.target.value })
-                        }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white"
+                        onChange={(e) => setHeroForm({ ...heroForm, socialHandle: e.target.value })}
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-sm"
                       />
                     </div>
                   </div>
@@ -921,171 +913,196 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               </form>
             )}
 
-            {/* 3. CEO CHARACTER & LIP-SYNC STUDIO */}
-            {isMasterOwner && activeTab === 'character' && (
-              <form onSubmit={handleSaveCharacter} className="max-w-4xl space-y-6">
+            {/* 3. PAKISTANI ENGLISH VOICE ENGINE STUDIO */}
+            {isMasterOwner && activeTab === 'voice' && (
+              <form onSubmit={handleSaveVoice} className="max-w-3xl space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-display text-xl font-bold text-white">
-                      Transparent 3D CEO Character, Lip-Sync &amp; Gestures
+                      Pakistani English Voice Engine &amp; Acoustic Controls
                     </h3>
-                    <p className="text-xs text-slate-400">
-                      Zero solid background box — renders over pure alpha transparency in Glass,
-                      Dark, Light &amp; Cyber modes.
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Configures default Male/Female voice selection, speech frequency, pitch, and
+                      South Asian phonetic rules (e.g. soft dental &lsquo;dh&rsquo; in{' '}
+                      <strong>Randhawa → Run-dhaa-waa</strong>).
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={handleTestVoice}
-                    className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/50 bg-cyan-500/15 px-4 py-2 text-xs font-semibold text-cyan-300"
+                    className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-cyan-400"
                   >
                     <Volume2 className="h-4 w-4" />
-                    <span>Test Voice Intro</span>
+                    <span>Test Voice Live</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {presetOptions.map((opt) => {
-                    const active =
-                      charForm.presetStyle === opt.id && !charForm.customImageUrl.trim();
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() =>
-                          setCharForm({
-                            ...charForm,
-                            presetStyle: opt.id,
-                            customImageUrl: '',
+                <div className="ss-glass-card rounded-2xl p-6 space-y-6">
+                  {/* Voice Gender Selector */}
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold text-slate-300">
+                      Voice Type (Male / Female)
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 max-w-md">
+                      {(['male', 'female'] as VoiceGender[]).map((g) => {
+                        const active = voiceForm.voiceGender === g;
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() =>
+                              setVoiceForm({
+                                ...voiceForm,
+                                voiceGender: g,
+                                preferredVoiceURI: '',
+                              })
+                            }
+                            className={`rounded-xl py-3 text-sm font-bold capitalize transition ${
+                              active ? 'keep-white-text shadow-md' : 'ss-glass-btn text-slate-300'
+                            }`}
+                            style={
+                              active
+                                ? {
+                                    backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            {g} Studio Voice
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Speech Frequency & Pitch Sliders */}
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-300">
+                        <span>Speech Frequency (Rate / Cadence)</span>
+                        <span className="font-mono font-bold text-cyan-400">
+                          {voiceForm.speechFrequency.toFixed(2)}x
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.65"
+                        max="1.40"
+                        step="0.05"
+                        value={voiceForm.speechFrequency}
+                        onChange={(e) =>
+                          setVoiceForm({
+                            ...voiceForm,
+                            speechFrequency: parseFloat(e.target.value),
                           })
                         }
-                        className={`flex flex-col overflow-hidden rounded-2xl border p-3 text-left transition ${
-                          active
-                            ? 'border-cyan-400 bg-cyan-500/15 shadow-lg'
-                            : 'ss-glass-card hover:border-cyan-400/40'
-                        }`}
-                      >
-                        <img
-                          src={CHARACTER_PRESET_IMAGES[opt.id]}
-                          alt={opt.label}
-                          className="mx-auto h-44 w-auto bg-transparent object-contain"
-                        />
-                        <div className="mt-3">
-                          <div className="text-xs font-bold text-white">{opt.label}</div>
-                          <p className="mt-0.5 text-[11px] text-slate-400">{opt.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                        className="w-full accent-cyan-500 cursor-pointer"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                  <div>
-                    <label className="mb-1 block text-xs text-slate-300">Aura Glow Color</label>
-                    <input
-                      type="color"
-                      value={charForm.auraColor}
-                      onChange={(e) => setCharForm({ ...charForm, auraColor: e.target.value })}
-                      className="h-10 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 p-1"
-                    />
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-300">
+                        <span>Voice Pitch Fine-Tune</span>
+                        <span className="font-mono font-bold text-cyan-400">
+                          {voiceForm.voicePitch.toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.65"
+                        max="1.35"
+                        step="0.02"
+                        value={voiceForm.voicePitch}
+                        onChange={(e) =>
+                          setVoiceForm({
+                            ...voiceForm,
+                            voicePitch: parseFloat(e.target.value),
+                          })
+                        }
+                        className="w-full accent-cyan-500 cursor-pointer"
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-xs text-slate-300">Idle Gesture Motion</label>
-                    <select
-                      value={charForm.gestureAnimation}
+                  {/* Optional Specific System Voice Override */}
+                  {systemVoices.length > 0 && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-slate-300">
+                        System Voice Engine Override (Auto-selects Pakistani / South Asian English by
+                        default)
+                      </label>
+                      <select
+                        value={voiceForm.preferredVoiceURI}
+                        onChange={(e) =>
+                          setVoiceForm({ ...voiceForm, preferredVoiceURI: e.target.value })
+                        }
+                        className="ss-glass-input w-full rounded-xl px-3.5 py-2.5 text-xs"
+                      >
+                        <option value="">
+                          Auto — Best Pakistani / South Asian English ({voiceForm.voiceGender})
+                        </option>
+                        {systemVoices
+                          .filter((v) => /^en/i.test(v.lang))
+                          .map((v) => (
+                            <option key={v.voiceURI} value={v.voiceURI}>
+                              {v.name} ({v.lang})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Phonetic Lexicon Toggle */}
+                  <label className="inline-flex cursor-pointer items-center gap-2.5 text-xs font-medium text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={voiceForm.pakistaniAccentPhonetics}
                       onChange={(e) =>
-                        setCharForm({
-                          ...charForm,
-                          gestureAnimation: e.target.value as CharacterConfig['gestureAnimation'],
+                        setVoiceForm({
+                          ...voiceForm,
+                          pakistaniAccentPhonetics: e.target.checked,
                         })
                       }
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"
-                    >
-                      <option value="subtle">Subtle Executive Float</option>
-                      <option value="dynamic">Dynamic Gesture</option>
-                      <option value="still">Minimal / Still</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs text-slate-300">
-                      Speech Rate ({charForm.voiceRate.toFixed(2)}x)
-                    </label>
-                    <input
-                      type="range"
-                      min="0.8"
-                      max="1.25"
-                      step="0.05"
-                      value={charForm.voiceRate}
-                      onChange={(e) =>
-                        setCharForm({ ...charForm, voiceRate: parseFloat(e.target.value) })
-                      }
-                      className="mt-2.5 w-full accent-cyan-400"
+                      className="h-4 w-4 rounded accent-cyan-500"
                     />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs text-slate-300">
-                      Voice Pitch ({charForm.voicePitch.toFixed(2)})
-                    </label>
-                    <input
-                      type="range"
-                      min="0.8"
-                      max="1.25"
-                      step="0.02"
-                      value={charForm.voicePitch}
-                      onChange={(e) =>
-                        setCharForm({ ...charForm, voicePitch: parseFloat(e.target.value) })
-                      }
-                      className="mt-2.5 w-full accent-cyan-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-xs font-semibold text-cyan-300 hover:border-cyan-400">
-                    <Upload className="h-3.5 w-3.5" />
-                    <span>Upload Custom Transparent PNG / WebP</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) =>
-                        handleUploadDataUrl(e, (url) =>
-                          setCharForm({ ...charForm, customImageUrl: url })
-                        )
-                      }
-                      className="hidden"
-                    />
+                    <span>
+                      Enable Pakistani English Phonetic Pronunciation Rules (Soft dental &lsquo;dh&rsquo;
+                      for Randhawa, Sarib, Muhammad)
+                    </span>
                   </label>
-
-                  <button
-                    type="submit"
-                    className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-6 py-2.5 text-xs font-bold shadow"
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>Save Character &amp; Voice</span>
-                  </button>
                 </div>
+
+                <button
+                  type="submit"
+                  className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold shadow"
+                  style={{
+                    backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                  }}
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save Global Voice Settings</span>
+                </button>
               </form>
             )}
 
-            {/* 4. SERVICES, CATEGORIES & PRICING CRUD */}
+            {/* 4. SERVICES & SHOPPING PORTAL CRUD */}
             {activeTab === 'services' && (
               <div className="space-y-8">
                 <form
                   onSubmit={handleSubmitService}
-                  className="ss-glass-card rounded-2xl border p-5 space-y-4"
+                  className="ss-glass-card rounded-2xl p-5 space-y-4"
                 >
                   <div className="flex items-center justify-between">
                     <h4 className="font-display text-base font-bold text-white">
-                      {editingServiceId ? 'Edit Service / Pricing' : 'Add Service, Category & Price'}
+                      {editingServiceId
+                        ? 'Edit Storefront Service Package'
+                        : 'Add Service Package & Cart Price'}
                     </h4>
                     {editingServiceId && (
                       <button
                         type="button"
                         onClick={resetServiceForm}
-                        className="text-xs text-slate-400 hover:text-white underline"
+                        className="text-xs text-slate-400 hover:underline"
                       >
                         Cancel Edit
                       </button>
@@ -1099,7 +1116,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Service Title"
                       value={srvTitle}
                       onChange={(e) => setSrvTitle(e.target.value)}
-                      className="sm:col-span-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input sm:col-span-2 rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
@@ -1107,15 +1124,15 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Category (e.g. Engineering)"
                       value={srvCat}
                       onChange={(e) => setSrvCat(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       required
-                      placeholder="Price (e.g. From $1,800)"
+                      placeholder="Price (e.g. $1,800)"
                       value={srvPrice}
                       onChange={(e) => setSrvPrice(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                   </div>
 
@@ -1125,14 +1142,14 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Turnaround (e.g. 1 – 3 Weeks)"
                       value={srvTurnaround}
                       onChange={(e) => setSrvTurnaround(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Comma-separated deliverables"
                       value={srvDeliverables}
                       onChange={(e) => setSrvDeliverables(e.target.value)}
-                      className="sm:col-span-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input sm:col-span-2 rounded-xl px-3.5 py-2.5 text-sm"
                     />
                   </div>
 
@@ -1142,7 +1159,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     placeholder="Service description..."
                     value={srvDesc}
                     onChange={(e) => setSrvDesc(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 text-sm text-white"
+                    className="ss-glass-input w-full rounded-xl p-3.5 text-sm"
                   />
 
                   <div className="flex items-center justify-between">
@@ -1151,14 +1168,17 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         type="checkbox"
                         checked={srvFeatured}
                         onChange={(e) => setSrvFeatured(e.target.checked)}
-                        className="accent-cyan-400"
+                        className="accent-cyan-500"
                       />
                       <span>Mark as Flagship Featured Service</span>
                     </label>
 
                     <button
                       type="submit"
-                      className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-xs font-bold"
+                      className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold"
+                      style={{
+                        backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                      }}
                     >
                       {editingServiceId ? (
                         <>
@@ -1179,7 +1199,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                   {cmsData.services.map((s) => (
                     <div
                       key={s.id}
-                      className="ss-glass-card flex items-start justify-between gap-4 rounded-2xl border p-4"
+                      className="ss-glass-card flex items-start justify-between gap-4 rounded-2xl p-4"
                     >
                       <div>
                         <span className="text-[11px] font-semibold uppercase text-cyan-400">
@@ -1195,17 +1215,17 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           type="button"
                           onClick={() => startEditService(s)}
                           title="Edit Service"
-                          className="rounded-lg p-2 text-slate-400 hover:bg-cyan-500/15 hover:text-cyan-300"
+                          className="ss-glass-btn rounded-lg p-2"
                         >
-                          <Edit3 className="h-4 w-4" />
+                          <Edit3 className="h-4 w-4 text-cyan-400" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteService(s.id)}
                           title="Delete Service"
-                          className="rounded-lg p-2 text-slate-400 hover:bg-rose-500/15 hover:text-rose-400"
+                          className="ss-glass-btn rounded-lg p-2"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-rose-400" />
                         </button>
                       </div>
                     </div>
@@ -1219,7 +1239,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               <div className="space-y-8">
                 <form
                   onSubmit={handleSubmitProject}
-                  className="ss-glass-card rounded-2xl border p-5 space-y-4"
+                  className="ss-glass-card rounded-2xl p-5 space-y-4"
                 >
                   <div className="flex items-center justify-between">
                     <h4 className="font-display text-base font-bold text-white">
@@ -1229,7 +1249,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       <button
                         type="button"
                         onClick={resetProjectForm}
-                        className="text-xs text-slate-400 hover:text-white underline"
+                        className="text-xs text-slate-400 hover:underline"
                       >
                         Cancel Edit
                       </button>
@@ -1243,21 +1263,21 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Project Title"
                       value={projTitle}
                       onChange={(e) => setProjTitle(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Subtitle"
                       value={projSubtitle}
                       onChange={(e) => setProjSubtitle(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Category"
                       value={projCategory}
                       onChange={(e) => setProjCategory(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                   </div>
 
@@ -1267,28 +1287,28 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Client Name"
                       value={projClient}
                       onChange={(e) => setProjClient(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Year"
                       value={projYear}
                       onChange={(e) => setProjYear(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Metric Label"
                       value={projMetricLabel}
                       onChange={(e) => setProjMetricLabel(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Metric Value (e.g. +240%)"
                       value={projMetric}
                       onChange={(e) => setProjMetric(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-sm"
                     />
                   </div>
 
@@ -1298,11 +1318,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     placeholder="Project summary..."
                     value={projDesc}
                     onChange={(e) => setProjDesc(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 text-sm text-white"
+                    className="ss-glass-input w-full rounded-xl p-3.5 text-sm"
                   />
 
                   <div className="flex flex-wrap items-center gap-4">
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2 text-xs font-semibold text-cyan-300">
+                    <label className="ss-glass-btn inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold text-cyan-400">
                       <Upload className="h-3.5 w-3.5" />
                       <span>Upload Project Image</span>
                       <input
@@ -1317,11 +1337,14 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Tech tags (comma-separated)"
                       value={projTags}
                       onChange={(e) => setProjTags(e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs text-white"
+                      className="ss-glass-input flex-1 rounded-xl px-3.5 py-2 text-xs"
                     />
                     <button
                       type="submit"
-                      className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-xs font-bold"
+                      className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold"
+                      style={{
+                        backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                      }}
                     >
                       {editingProjectId ? (
                         <>
@@ -1342,7 +1365,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                   {cmsData.projects.map((p) => (
                     <div
                       key={p.id}
-                      className="ss-glass-card flex items-center justify-between gap-4 rounded-2xl border p-4"
+                      className="ss-glass-card flex items-center justify-between gap-4 rounded-2xl p-4"
                     >
                       <div className="flex items-center gap-3.5">
                         <img
@@ -1362,17 +1385,17 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           type="button"
                           onClick={() => startEditProject(p)}
                           title="Edit Project"
-                          className="rounded-lg p-2 text-slate-400 hover:bg-cyan-500/15 hover:text-cyan-300"
+                          className="ss-glass-btn rounded-lg p-2"
                         >
-                          <Edit3 className="h-4 w-4" />
+                          <Edit3 className="h-4 w-4 text-cyan-400" />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteProject(p.id)}
                           title="Delete Project"
-                          className="rounded-lg p-2 text-slate-400 hover:bg-rose-500/15 hover:text-rose-400"
+                          className="ss-glass-btn rounded-lg p-2"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-rose-400" />
                         </button>
                       </div>
                     </div>
@@ -1381,11 +1404,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               </div>
             )}
 
-            {/* 6. REAL-TIME LEADS & ORDERS MANAGEMENT */}
+            {/* 6. ORDERS & CART LEADS */}
             {activeTab === 'orders' && (
               <div className="space-y-4">
                 <h3 className="font-display text-xl font-bold text-white">
-                  Live Client Orders &amp; Project Inquiries ({orders.length})
+                  Live Client Orders &amp; Cart Checkouts ({orders.length})
                 </h3>
 
                 {orders.map((ord) => {
@@ -1395,10 +1418,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     adminResponse: ord.adminResponse,
                   };
                   return (
-                    <div
-                      key={ord.id}
-                      className="ss-glass-card rounded-2xl border p-5 space-y-4"
-                    >
+                    <div key={ord.id} className="ss-glass-card rounded-2xl p-5 space-y-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <h4 className="font-display text-base font-bold text-white">
@@ -1407,20 +1427,20 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                               ({ord.clientEmail})
                             </span>
                           </h4>
-                          <p className="text-xs text-cyan-400 font-medium mt-0.5">
+                          <p className="text-xs text-cyan-400 font-semibold mt-0.5">
                             {ord.serviceTitle} • {ord.budgetRange} • {ord.timeline}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => api.deleteInquiry(ord.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:text-rose-400"
+                          className="ss-glass-btn rounded-lg p-1.5"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-rose-400" />
                         </button>
                       </div>
 
-                      <p className="rounded-xl border border-slate-700/40 bg-slate-950/60 p-3.5 text-xs text-slate-300">
+                      <p className="ss-glass-card rounded-xl p-3.5 text-xs text-slate-300">
                         {ord.projectDetails}
                       </p>
 
@@ -1436,9 +1456,9 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                               },
                             })
                           }
-                          className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
+                          className="ss-glass-input rounded-xl px-3 py-2 text-xs"
                         >
-                          <option value="new">New Inquiry</option>
+                          <option value="new">New Order / Lead</option>
                           <option value="reviewing">Reviewing</option>
                           <option value="quoted">Quoted</option>
                           <option value="in-progress">In Progress</option>
@@ -1447,7 +1467,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
 
                         <input
                           type="text"
-                          placeholder="Quoted Price (e.g. $4,500)"
+                          placeholder="Quoted Price (e.g. $3,500)"
                           value={draft.quotedAmount}
                           onChange={(e) =>
                             setQuoteDrafts({
@@ -1455,21 +1475,24 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                               [ord.id]: { ...draft, quotedAmount: e.target.value },
                             })
                           }
-                          className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
+                          className="ss-glass-input rounded-xl px-3 py-2 text-xs"
                         />
 
                         <button
                           type="button"
                           onClick={() => handleSaveOrderResponse(ord)}
-                          className="keep-white-text rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-4 py-2 text-xs font-bold"
+                          className="keep-white-text ss-cta-btn rounded-xl px-4 py-2 text-xs font-bold"
+                          style={{
+                            backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                          }}
                         >
-                          Send Quote to Client Portal
+                          Sync Quote to Client Portal
                         </button>
                       </div>
 
                       <textarea
                         rows={2}
-                        placeholder="Write executive response visible in the client's portal..."
+                        placeholder="Write executive response synced live to client portal..."
                         value={draft.adminResponse}
                         onChange={(e) =>
                           setQuoteDrafts({
@@ -1477,7 +1500,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                             [ord.id]: { ...draft, adminResponse: e.target.value },
                           })
                         }
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-white"
+                        className="ss-glass-input w-full rounded-xl p-3 text-xs"
                       />
                     </div>
                   );
@@ -1485,7 +1508,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               </div>
             )}
 
-            {/* 7. SUB-ADMIN ROLE AUTHORIZATION PORTAL (STRICTLY MASTER OWNER ONLY) */}
+            {/* 7. SUB-ADMIN AUTHORIZATION PORTAL (MASTER OWNER ONLY) */}
             {isMasterOwner && activeTab === 'subadmins' && (
               <div className="max-w-4xl space-y-6">
                 <div>
@@ -1493,18 +1516,17 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     Sub-Admin Role Authorization Portal
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Authorize team members to sign into the unified Sign-In modal with restricted
-                    permissions (Services, Projects, or Leads) while keeping Master Branding, Meta,
-                    and Character Studio strictly locked to Muhammad Sarib Randhawa.
+                    Assign granular permissions for team members while keeping Master Branding,
+                    Voice Engine, and Theme settings strictly exclusive to Muhammad Sarib Randhawa.
                   </p>
                 </div>
 
                 <form
                   onSubmit={handleCreateSubAdmin}
-                  className="ss-glass-card rounded-2xl border p-5 space-y-4"
+                  className="ss-glass-card rounded-2xl p-5 space-y-4"
                 >
                   <h4 className="font-display text-sm font-bold text-white">
-                    Create New Sub-Admin Account
+                    Create Sub-Admin Account
                   </h4>
 
                   <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -1514,22 +1536,22 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       placeholder="Display Name"
                       value={subName}
                       onChange={(e) => setSubName(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-xs"
                     />
                     <input
                       type="text"
                       required
-                      placeholder="Login Username"
+                      placeholder="Username"
                       value={subUsername}
                       onChange={(e) => setSubUsername(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-xs"
                     />
                     <input
                       type="email"
                       placeholder="Google / Work Email"
                       value={subEmail}
                       onChange={(e) => setSubEmail(e.target.value)}
-                      className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-xs text-white"
+                      className="ss-glass-input rounded-xl px-3.5 py-2.5 text-xs"
                     />
                     <div className="relative">
                       <input
@@ -1538,7 +1560,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         placeholder="Password"
                         value={subPassword}
                         onChange={(e) => setSubPassword(e.target.value)}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-3.5 pr-9 text-xs text-white"
+                        className="ss-glass-input w-full rounded-xl py-2.5 pl-3.5 pr-9 text-xs"
                       />
                       <button
                         type="button"
@@ -1562,7 +1584,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           }
                           className="accent-cyan-500"
                         />
-                        <span>Manage Services &amp; Pricing</span>
+                        <span>Manage Services &amp; Prices</span>
                       </label>
                       <label className="inline-flex items-center gap-2 cursor-pointer">
                         <input
@@ -1584,13 +1606,16 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           }
                           className="accent-cyan-500"
                         />
-                        <span>Manage Customer Orders</span>
+                        <span>Manage Orders &amp; Leads</span>
                       </label>
                     </div>
 
                     <button
                       type="submit"
-                      className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-5 py-2.5 text-xs font-bold"
+                      className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold"
+                      style={{
+                        backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                      }}
                     >
                       <Plus className="h-4 w-4" />
                       <span>Authorize Sub-Admin</span>
@@ -1598,12 +1623,11 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                   </div>
                 </form>
 
-                {/* Active Sub-Admins List */}
                 <div className="space-y-3">
                   {cmsData.subAdmins.map((sa) => (
                     <div
                       key={sa.id}
-                      className="ss-glass-card flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4"
+                      className="ss-glass-card flex flex-wrap items-center justify-between gap-4 rounded-2xl p-4"
                     >
                       <div>
                         <p className="text-sm font-bold text-white">{sa.displayName}</p>
@@ -1613,14 +1637,14 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs">
                         <button
                           type="button"
                           onClick={() => handleToggleSubPermission(sa.id, 'canManageServices')}
                           className={`rounded-lg border px-2.5 py-1 font-semibold ${
                             sa.permissions.canManageServices
                               ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                              : 'border-slate-700 text-slate-400'
+                              : 'border-slate-400/30 text-slate-400'
                           }`}
                         >
                           Services
@@ -1631,7 +1655,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           className={`rounded-lg border px-2.5 py-1 font-semibold ${
                             sa.permissions.canManageProjects
                               ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                              : 'border-slate-700 text-slate-400'
+                              : 'border-slate-400/30 text-slate-400'
                           }`}
                         >
                           Projects
@@ -1642,7 +1666,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           className={`rounded-lg border px-2.5 py-1 font-semibold ${
                             sa.permissions.canManageOrders
                               ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                              : 'border-slate-700 text-slate-400'
+                              : 'border-slate-400/30 text-slate-400'
                           }`}
                         >
                           Orders
@@ -1650,9 +1674,9 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                         <button
                           type="button"
                           onClick={() => handleDeleteSubAdmin(sa.id)}
-                          className="rounded-lg p-2 text-rose-400 hover:bg-rose-500/15"
+                          className="ss-glass-btn rounded-lg p-2"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-rose-400" />
                         </button>
                       </div>
                     </div>
@@ -1661,24 +1685,23 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
               </div>
             )}
 
-            {/* 8. MULTI-THEME ENGINE & PALETTE */}
+            {/* 8. PURE GLASS THEME & BACKGROUND ROBOT ANIMATION CONTROLS */}
             {isMasterOwner && activeTab === 'theme' && (
-              <form onSubmit={handleSaveTheme} className="max-w-xl space-y-6">
+              <form onSubmit={handleSaveTheme} className="max-w-2xl space-y-6">
                 <h3 className="font-display text-xl font-bold text-white">
-                  Default Theme Mode &amp; Global Brand Palette
+                  True Glass Theme, Brand Colors &amp; Background Robot Canvas
                 </h3>
 
                 <div>
                   <label className="mb-2 block text-xs font-medium text-slate-300">
                     Default Theme Mode for Visitors
                   </label>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-3">
                     {(
                       [
-                        { id: 'glass', label: 'Glass (Default)' },
-                        { id: 'dark', label: 'Dark Obsidian' },
-                        { id: 'light', label: 'Light Studio' },
-                        { id: 'cyber', label: 'Cyber Neon' },
+                        { id: 'glass', label: 'Pure Frosted Glass (Default)' },
+                        { id: 'dark', label: 'Dark Obsidian Glass' },
+                        { id: 'cyber', label: 'Cyber Neon Glass' },
                       ] as { id: ThemeMode; label: string }[]
                     ).map((m) => (
                       <button
@@ -1688,11 +1711,18 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                           setThemeForm({ ...themeForm, defaultMode: m.id });
                           onChangeThemeMode(m.id);
                         }}
-                        className={`rounded-xl border py-2.5 text-xs font-bold transition ${
+                        className={`rounded-xl py-2.5 px-3 text-xs font-bold transition ${
                           themeForm.defaultMode === m.id
-                            ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300'
-                            : 'ss-glass-card text-slate-300'
+                            ? 'keep-white-text shadow'
+                            : 'ss-glass-btn text-slate-300'
                         }`}
+                        style={
+                          themeForm.defaultMode === m.id
+                            ? {
+                                backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                              }
+                            : undefined
+                        }
                       >
                         {m.label}
                       </button>
@@ -1709,7 +1739,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       onChange={(e) =>
                         setThemeForm({ ...themeForm, primaryAccent: e.target.value })
                       }
-                      className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 p-1"
+                      className="h-11 w-full cursor-pointer rounded-xl ss-glass-input p-1"
                     />
                   </div>
                   <div>
@@ -1720,28 +1750,76 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       onChange={(e) =>
                         setThemeForm({ ...themeForm, secondaryAccent: e.target.value })
                       }
-                      className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 p-1"
+                      className="h-11 w-full cursor-pointer rounded-xl ss-glass-input p-1"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-slate-300">Tertiary Glow</label>
+                    <label className="mb-1 block text-xs text-slate-300">Ripple Glow</label>
                     <input
                       type="color"
                       value={themeForm.tertiaryAccent}
                       onChange={(e) =>
                         setThemeForm({ ...themeForm, tertiaryAccent: e.target.value })
                       }
-                      className="h-11 w-full cursor-pointer rounded-xl border border-slate-700 bg-slate-950 p-1"
+                      className="h-11 w-full cursor-pointer rounded-xl ss-glass-input p-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <div className="mb-1 flex justify-between text-xs text-slate-300">
+                      <span>Autonomous Micro-Robot Count</span>
+                      <span className="font-mono font-bold text-cyan-400">
+                        {themeForm.robotDensity}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="4"
+                      max="16"
+                      step="1"
+                      value={themeForm.robotDensity}
+                      onChange={(e) =>
+                        setThemeForm({ ...themeForm, robotDensity: parseInt(e.target.value, 10) })
+                      }
+                      className="w-full accent-cyan-500"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex justify-between text-xs text-slate-300">
+                      <span>Finger-Touch Ripple Radius</span>
+                      <span className="font-mono font-bold text-cyan-400">
+                        {themeForm.rippleIntensity.toFixed(2)}x
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.6"
+                      max="1.5"
+                      step="0.05"
+                      value={themeForm.rippleIntensity}
+                      onChange={(e) =>
+                        setThemeForm({
+                          ...themeForm,
+                          rippleIntensity: parseFloat(e.target.value),
+                        })
+                      }
+                      className="w-full accent-cyan-500"
                     />
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="keep-white-text inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 px-6 py-3 text-sm font-bold shadow"
+                  className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold shadow"
+                  style={{
+                    backgroundImage: `linear-gradient(135deg, ${themeForm.primaryAccent}, ${themeForm.secondaryAccent})`,
+                  }}
                 >
                   <Save className="h-4 w-4" />
-                  <span>Save Theme &amp; Colors Live</span>
+                  <span>Save Theme &amp; Robot Canvas Settings</span>
                 </button>
               </form>
             )}

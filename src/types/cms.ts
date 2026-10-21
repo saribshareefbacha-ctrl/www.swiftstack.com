@@ -1,6 +1,6 @@
-export type ThemeMode = 'glass' | 'dark' | 'light' | 'cyber';
+export type ThemeMode = 'glass' | 'dark' | 'cyber';
 
-export type CharacterPresetStyle = 'executive-polo' | 'midnight-blazer' | 'tech-minimalist';
+export type VoiceGender = 'male' | 'female';
 
 export interface SiteBrandingMeta {
   pageTitle: string;
@@ -10,14 +10,12 @@ export interface SiteBrandingMeta {
   profileIconUrl: string;
 }
 
-export interface CharacterConfig {
-  presetStyle: CharacterPresetStyle;
-  customImageUrl: string;
-  greetingBadgeText: string;
-  gestureAnimation: 'subtle' | 'dynamic' | 'still';
-  auraColor: string;
-  voiceRate: number;
-  voicePitch: number;
+export interface VoiceEngineConfig {
+  voiceGender: VoiceGender;
+  speechFrequency: number; // Speech rate/cadence (0.65 - 1.40)
+  voicePitch: number; // Pitch tuning (0.65 - 1.35)
+  pakistaniAccentPhonetics: boolean;
+  preferredVoiceURI: string;
 }
 
 export interface HeroCMS {
@@ -30,6 +28,7 @@ export interface HeroCMS {
   founderName: string;
   founderTitle: string;
   founderBio: string;
+  voiceStageLabel: string;
   voiceGreeting: string;
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
@@ -49,14 +48,11 @@ export interface HeroCMS {
 
 export interface ThemeCMS {
   defaultMode: ThemeMode;
-  backgroundHex: string;
   primaryAccent: string;
   secondaryAccent: string;
   tertiaryAccent: string;
-  glassOpacity: number;
-  particleDensity: number;
-  scrollSpeed: number;
-  wireframeOpacity: number;
+  robotDensity: number;
+  rippleIntensity: number;
 }
 
 export interface ServiceItem {
@@ -66,10 +62,21 @@ export interface ServiceItem {
   shortDescription: string;
   deliverables: string[];
   priceLabel: string;
+  basePriceUsd: number;
   turnaround: string;
   iconName: string;
   accentHex: string;
   featured: boolean;
+}
+
+export interface CartItem {
+  serviceId: string;
+  title: string;
+  category: string;
+  priceLabel: string;
+  basePriceUsd: number;
+  turnaround: string;
+  quantity: number;
 }
 
 export interface ProjectItem {
@@ -100,6 +107,7 @@ export interface InquiryItem {
   budgetRange: string;
   timeline: string;
   projectDetails: string;
+  cartSummary?: CartItem[];
   status: InquiryStatus;
   quotedAmount: string;
   adminResponse: string;
@@ -140,8 +148,8 @@ export interface UserProfile {
 export interface SiteCMSData {
   branding: SiteBrandingMeta;
   hero: HeroCMS;
+  voice: VoiceEngineConfig;
   theme: ThemeCMS;
-  character: CharacterConfig;
   services: ServiceItem[];
   projects: ProjectItem[];
   subAdmins: SubAdminAccount[];

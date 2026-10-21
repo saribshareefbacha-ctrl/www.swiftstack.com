@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAnalytics, isSupported, Analytics } from 'firebase/analytics';
+import { getAnalytics, Analytics } from 'firebase/analytics';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
@@ -13,29 +13,20 @@ export const firebaseConfig = {
   measurementId: 'G-Y9K67T9C6H',
 };
 
-// Initialize Firebase App
-export const firebaseApp = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
+export const firebaseApp = app;
 
-// Safely initialize Firebase Analytics in browser environments
-export let firebaseAnalytics: Analytics | null = null;
+export let analytics: Analytics | null = null;
 if (typeof window !== 'undefined') {
-  isSupported()
-    .then((supported) => {
-      if (supported) {
-        try {
-          firebaseAnalytics = getAnalytics(firebaseApp);
-        } catch {
-          // Ignore browser storage/privacy blocks in embedded previews
-        }
-      }
-    })
-    .catch(() => {});
+  try {
+    analytics = getAnalytics(app);
+  } catch {
+    analytics = null;
+  }
 }
 
-// Initialize Firebase Authentication & Google Provider
-export const firebaseAuth = getAuth(firebaseApp);
+export const firebaseAuth = getAuth(app);
 export const googleAuthProvider = new GoogleAuthProvider();
 googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Initialize Cloud Firestore
-export const firestoreDb = getFirestore(firebaseApp);
+export const firestoreDb = getFirestore(app);

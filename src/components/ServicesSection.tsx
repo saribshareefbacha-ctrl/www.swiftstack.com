@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowUpRight,
   Boxes,
+  Check,
   CheckCircle2,
   CloudCog,
   Code2,
@@ -11,19 +12,22 @@ import {
   Layers,
   Megaphone,
   Plus,
+  ShoppingBag,
   Smartphone,
   Sparkles,
   Video,
 } from 'lucide-react';
-import { ServiceItem, ThemeCMS } from '../types/cms';
+import { CartItem, ServiceItem, ThemeCMS } from '../types/cms';
 
 interface ServicesSectionProps {
   services: ServiceItem[];
   theme: ThemeCMS;
+  cart: CartItem[];
   headingPrefix?: string;
   headingHighlight?: string;
   subheading?: string;
   isOwner: boolean;
+  onAddToCart: (service: ServiceItem) => void;
   onSelectServiceForQuote: (serviceTitle: string) => void;
   onManageServices: () => void;
 }
@@ -40,80 +44,58 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Layers,
 };
 
-const Interactive3DServiceCard: React.FC<{
+const GlassServiceCard: React.FC<{
   service: ServiceItem;
   theme: ThemeCMS;
   index: number;
+  inCartQty: number;
+  onAddToCart: (srv: ServiceItem) => void;
   onSelect: (title: string) => void;
-}> = ({ service, theme, index, onSelect }) => {
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50 });
+}> = ({ service, theme, index, inCartQty, onAddToCart, onSelect }) => {
+  const [justAdded, setJustAdded] = useState(false);
   const IconComp = ICON_MAP[service.iconName] || Sparkles;
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    setTilt({
-      rx: (0.5 - py) * 9,
-      ry: (px - 0.5) * 9,
-      gx: px * 100,
-      gy: py * 100,
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setTilt({ rx: 0, ry: 0, gx: 50, gy: 50 });
+  const handleAdd = () => {
+    onAddToCart(service);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1200);
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 26 }}
+      initial={{ opacity: 0, y: 22 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.5, delay: (index % 3) * 0.08 }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      style={{
-        transform: `perspective(1100px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`,
-        transformStyle: 'preserve-3d',
-      }}
-      className="ss-glass-card group relative rounded-3xl border hover:border-cyan-400/50 p-6 sm:p-7 flex flex-col justify-between transition-all duration-200 overflow-hidden"
+      viewport={{ once: true, margin: '-50px' }}
+      transition={{ duration: 0.45, delay: (index % 3) * 0.06 }}
+      className="ss-glass-card ss-glass-interactive group flex h-full flex-col justify-between rounded-3xl p-6 sm:p-7"
     >
-      {/* Dynamic Cursor Spotlight Glow */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{
-          background: `radial-gradient(circle 240px at ${tilt.gx}% ${tilt.gy}%, ${service.accentHex}22, transparent 80%)`,
-        }}
-      />
-
-      <div className="relative z-10 space-y-4">
+      <div className="space-y-4">
         {/* Top Row: Icon Badge + Category & Flagship Tag */}
         <div className="flex items-start justify-between gap-3">
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center border border-slate-700/30 shadow-md transition-transform duration-300 group-hover:scale-110"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-400/25 shadow-sm transition-transform duration-300 group-hover:scale-105"
             style={{
-              background: `linear-gradient(135deg, ${service.accentHex}28, transparent)`,
+              background: `linear-gradient(135deg, ${service.accentHex}22, transparent)`,
               color: service.accentHex,
             }}
           >
-            <IconComp className="w-6 h-6" />
+            <IconComp className="h-6 w-6" />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {service.featured && (
               <span
-                className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-1 rounded-full font-semibold"
+                className="rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider"
                 style={{
-                  backgroundColor: `${theme.primaryAccent}20`,
+                  backgroundColor: `${theme.primaryAccent}1a`,
                   color: theme.primaryAccent,
-                  border: `1px solid ${theme.primaryAccent}45`,
+                  border: `1px solid ${theme.primaryAccent}40`,
                 }}
               >
                 Flagship
               </span>
             )}
-            <span className="ss-glass-card text-xs font-mono text-slate-400 px-2.5 py-1 rounded-full border">
+            <span className="ss-glass-card rounded-full px-2.5 py-1 font-mono text-[11px] font-medium text-slate-400">
               {service.category}
             </span>
           </div>
@@ -121,21 +103,21 @@ const Interactive3DServiceCard: React.FC<{
 
         {/* Service Title & Description */}
         <div>
-          <h3 className="font-display font-bold text-xl text-white group-hover:text-cyan-400 transition-colors">
+          <h3 className="font-display text-xl font-bold text-white transition-colors group-hover:text-cyan-400">
             {service.title}
           </h3>
-          <p className="mt-2.5 text-sm text-slate-300 leading-relaxed">
+          <p className="mt-2.5 text-sm leading-relaxed text-slate-300">
             {service.shortDescription}
           </p>
         </div>
 
-        {/* Key Deliverables List */}
+        {/* Deliverables */}
         {service.deliverables.length > 0 && (
           <ul className="space-y-1.5 pt-2">
             {service.deliverables.map((item, idx) => (
               <li key={idx} className="flex items-center gap-2 text-xs text-slate-300">
                 <CheckCircle2
-                  className="w-3.5 h-3.5 shrink-0"
+                  className="h-3.5 w-3.5 shrink-0"
                   style={{ color: service.accentHex }}
                 />
                 <span>{item}</span>
@@ -145,25 +127,46 @@ const Interactive3DServiceCard: React.FC<{
         )}
       </div>
 
-      {/* Footer Pricing, Turnaround & Quote Trigger */}
-      <div className="relative z-10 mt-6 pt-4 border-t border-slate-700/40 flex items-center justify-between gap-3">
+      {/* Footer Pricing, Add to Cart & Quote Trigger */}
+      <div className="mt-6 border-t border-slate-400/25 pt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="font-display font-bold text-base text-white">
+          <div className="font-display text-lg font-extrabold text-white">
             {service.priceLabel}
           </div>
-          <div className="text-[11px] font-mono text-slate-400">
-            Est. {service.turnaround}
-          </div>
+          <div className="font-mono text-[11px] text-slate-400">Est. {service.turnaround}</div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onSelect(service.title)}
-          className="ss-glass-card inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white hover:border-cyan-400 hover:text-cyan-400 border transition-all"
-        >
-          <span>Request Quote</span>
-          <ArrowUpRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="keep-white-text ss-cta-btn inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold shadow-sm"
+            style={{
+              backgroundImage: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
+            }}
+          >
+            {justAdded ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                <span>Added{inCartQty > 0 ? ` (${inCartQty})` : ''}</span>
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="h-3.5 w-3.5" />
+                <span>{inCartQty > 0 ? `In Cart (${inCartQty})` : 'Add to Cart'}</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelect(service.title)}
+            className="ss-glass-btn inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold"
+          >
+            <span>Quote</span>
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </motion.div>
   );
@@ -172,10 +175,12 @@ const Interactive3DServiceCard: React.FC<{
 export const ServicesSection: React.FC<ServicesSectionProps> = ({
   services,
   theme,
-  headingPrefix = 'Full-Spectrum Engineering,',
-  headingHighlight = 'Cloud Architecture & AI Media',
-  subheading = 'Every engagement combines precision software engineering with clean visual direction — architected end-to-end under Muhammad Sarib Randhawa.',
+  cart,
+  headingPrefix = 'Full-Spectrum Services &',
+  headingHighlight = 'Instant Shopping Portal',
+  subheading = 'Add individual engineering or AI media packages straight to your glass shopping cart, or request a tailored multi-milestone architecture quote directly from Muhammad Sarib Randhawa.',
   isOwner,
+  onAddToCart,
   onSelectServiceForQuote,
   onManageServices,
 }) => {
@@ -191,18 +196,26 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
     return services.filter((s) => s.category === selectedCategory);
   }, [services, selectedCategory]);
 
+  const cartQtyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    cart.forEach((item) => {
+      map[item.serviceId] = item.quantity;
+    });
+    return map;
+  }, [cart]);
+
   return (
     <section id="services" className="relative py-24 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-400">
+            <div className="inline-flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-widest text-cyan-400">
               <span
-                className="w-2 h-2 rounded-full"
+                className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: theme.primaryAccent }}
               />
-              <span>SwiftStack (SS) Capabilities Matrix</span>
+              <span>SwiftStack (SS) Agency &amp; Service Storefront</span>
             </div>
             <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
               {headingPrefix}{' '}
@@ -215,16 +228,17 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                 {headingHighlight}
               </span>
             </h2>
-            <p className="text-slate-300 text-base sm:text-lg">{subheading}</p>
+            <p className="text-slate-300 text-base sm:text-lg leading-relaxed">{subheading}</p>
           </div>
 
           {isOwner && (
             <button
+              type="button"
               onClick={onManageServices}
-              className="self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/30 transition-colors"
+              className="ss-glass-btn self-start lg:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-cyan-400"
             >
-              <Plus className="w-4 h-4" />
-              <Edit3 className="w-3.5 h-3.5" />
+              <Plus className="h-4 w-4" />
+              <Edit3 className="h-3.5 w-3.5" />
               <span>Manage Services ({services.length})</span>
             </button>
           )}
@@ -237,11 +251,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
             return (
               <button
                 key={cat}
+                type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all border ${
-                  active
-                    ? 'keep-white-text font-semibold shadow-lg border-transparent'
-                    : 'ss-glass-card text-slate-300 hover:border-cyan-400/50 hover:text-white'
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
+                  active ? 'keep-white-text ss-cta-btn shadow-md' : 'ss-glass-btn text-slate-300'
                 }`}
                 style={
                   active
@@ -257,14 +270,16 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
           })}
         </div>
 
-        {/* Interactive Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Equal-Height Glass Services Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
           {filteredServices.map((srv, idx) => (
-            <Interactive3DServiceCard
+            <GlassServiceCard
               key={srv.id}
               service={srv}
               theme={theme}
               index={idx}
+              inCartQty={cartQtyMap[srv.id] || 0}
+              onAddToCart={onAddToCart}
               onSelect={onSelectServiceForQuote}
             />
           ))}
