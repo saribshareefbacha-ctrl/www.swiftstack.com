@@ -1,9 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from './data/defaultSeed';
-import { InquiryItem, SiteCMSData, ThemeMode, UserProfile } from './types/cms';
-import { api, getSavedThemeMode, saveThemeMode } from './utils/api';
+import {
+  CartItem,
+  InquiryItem,
+  ServiceItem,
+  SiteCMSData,
+  ThemeMode,
+  UserProfile,
+  VoiceEngineConfig,
+} from './types/cms';
+import {
+  api,
+  getSavedCart,
+  getSavedThemeMode,
+  saveCart,
+  saveThemeMode,
+} from './utils/api';
 import { syncDocumentBranding } from './utils/branding';
-import { ScrollScene3D } from './components/three/ScrollScene3D';
+import { FuturisticRobotCanvas } from './components/FuturisticRobotCanvas';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { ServicesSection } from './components/ServicesSection';
@@ -16,27 +30,36 @@ import { AdminCustomizationPanel, AdminTab } from './components/AdminCustomizati
 export function App() {
   const [cmsData, setCmsData] = useState<SiteCMSData>(DEFAULT_CMS_DATA);
   const [orders, setOrders] = useState<InquiryItem[]>(INITIAL_SAMPLE_INQUIRIES);
+  const [cart, setCart] = useState<CartItem[]>(() => getSavedCart());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => getSavedThemeMode() || DEFAULT_CMS_DATA.theme.defaultMode || 'glass'
   );
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [clientPortalOpen, setClientPortalOpen] = useState(false);
+  const [clientPortalTab, setClientPortalTab] = useState<
+    'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile'
+  >('orders');
   const [ownerStudioOpen, setOwnerStudioOpen] = useState(false);
   const [ownerStudioTab, setOwnerStudioTab] = useState<AdminTab>('branding');
   const [selectedServiceForQuote, setSelectedServiceForQuote] = useState('');
 
-  // Apply theme mode to <html> attribute
+  // Sync theme mode to <html data-theme="...">
   useEffect(() => {
     saveThemeMode(themeMode);
   }, [themeMode]);
 
-  // Real-time synchronize document <title>, <meta name="description"> & glowing Favicon
+  // Persist shopping cart
+  useEffect(() => {
+    saveCart(cart);
+  }, [cart]);
+
+  // Live update browser <title>, <meta name="description"> & glowing Favicon
   useEffect(() => {
     syncDocumentBranding(cmsData.branding, cmsData.theme);
   }, [cmsData.branding, cmsData.theme]);
 
-  // Real-time Firebase Cloud Subscriptions (CMS + Orders + Persisted Auth)
+  // Real-time Firebase Cloud Subscriptions
   useEffect(() => {
     const unsubCMS = api.subscribeCMS((liveCMS) => {
       setCmsData(liveCMS);
@@ -58,6 +81,11 @@ export function App() {
     };
   }, []);
 
+  const totalCartItems = useMemo(
+    () => cart.reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
+
   const activeClientOrdersCount = useMemo(() => {
     if (!currentUser || currentUser.role !== 'client') return 0;
     const emailClean = (currentUser.email || '').toLowerCase();
@@ -68,9 +96,63 @@ export function App() {
     ).length;
   }, [orders, currentUser]);
 
+  const handleAddToCart = (service: ServiceItem) => {
+    setCart((prev) => {
+      const exists = prev.find((i) => i.serviceId === service.id);
+      if (exists) {
+        return prev.map((i) =>
+          i.serviceId === service.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [
+        ...prev,
+        {
+          serviceId: service.id,
+          title: service.title,
+          category: service.category,
+          priceLabel: service.priceLabel,
+          basePriceUsd: service.basePriceUsd,
+          turnaround: service.turnaround,
+          quantity: 1,
+        },
+      ];
+    });
+  };
+
+  const handleUpdateCartQty = (serviceId: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((i) => (i.serviceId === serviceId ? { ...i, quantity: i.quantity + delta } : i))
+        .filter((i) => i.quantity > 0)
+    );
+  };
+
+  const handleClearCart = () => setCart([]);
+
+  const handleVoiceConfigChange = (nextVoice: VoiceEngineConfig) => {
+    setCmsData((prev) => ({ ...prev, voice: nextVoice }));
+    if (currentUser?.role === 'owner') {
+      api.updateVoice(nextVoice).catch(() => {});
+    }
+  };
+
   const openOwnerTab = (tab: AdminTab) => {
     setOwnerStudioTab(tab);
     setOwnerStudioOpen(true);
+  };
+
+  const scrollToSection = (selector: string) => {
+    const el = document.querySelector(selector);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleOpenCart = () => {
+    if (currentUser && currentUser.role === 'client') {
+      setClientPortalTab('cart');
+      setClientPortalOpen(true);
+    } else {
+      scrollToSection('#order');
+    }
   };
 
   const handleAuthenticated = (user: UserProfile) => {
@@ -80,6 +162,7 @@ export function App() {
     } else if (user.role === 'subadmin') {
       openOwnerTab('services');
     } else {
+      setClientPortalTab(cart.length > 0 ? 'cart' : 'orders');
       setClientPortalOpen(true);
     }
   };
@@ -91,11 +174,6 @@ export function App() {
     setClientPortalOpen(false);
   };
 
-  const scrollToSection = (selector: string) => {
-    const el = document.querySelector(selector);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const handleSelectServiceForOrder = (serviceTitle: string) => {
     setSelectedServiceForQuote(serviceTitle);
     scrollToSection('#order');
@@ -105,19 +183,18 @@ export function App() {
   const isStaff = isOwner || currentUser?.role === 'subadmin';
 
   return (
-    <div className="relative min-h-screen overflow-x-clip selection:bg-cyan-500/30">
-      {/* Multi-Theme Reactive 3D Ambient Background */}
-      <ScrollScene3D
+    <div className="relative min-h-screen overflow-x-clip selection:bg-cyan-500/25">
+      {/* Interactive Futuristic Background Robot Canvas + Human/Robot Index Finger Touch Ripple */}
+      <FuturisticRobotCanvas
         themeMode={themeMode}
         primaryHex={cmsData.theme.primaryAccent}
         secondaryHex={cmsData.theme.secondaryAccent}
         accentHex={cmsData.theme.tertiaryAccent}
-        particleDensity={cmsData.theme.particleDensity}
-        scrollSpeed={cmsData.theme.scrollSpeed}
-        wireframeOpacity={cmsData.theme.wireframeOpacity}
+        robotDensity={cmsData.theme.robotDensity}
+        rippleIntensity={cmsData.theme.rippleIntensity}
       />
 
-      {/* Sleek Conversion Navbar with Glowing Profile Badge & 4-Mode Theme Switcher */}
+      {/* Pure Transparent Frosted Glass Navbar */}
       <Navbar
         primaryColor={cmsData.theme.primaryAccent}
         secondaryColor={cmsData.theme.secondaryAccent}
@@ -126,34 +203,42 @@ export function App() {
         profileIconUrl={cmsData.branding.profileIconUrl}
         themeMode={themeMode}
         onChangeThemeMode={setThemeMode}
+        cartCount={totalCartItems}
+        onOpenCart={handleOpenCart}
         currentUser={currentUser}
         activeOrdersCount={activeClientOrdersCount}
         onOpenAuth={() => setAuthModalOpen(true)}
-        onOpenPortal={() => setClientPortalOpen(true)}
+        onOpenPortal={() => {
+          setClientPortalTab('orders');
+          setClientPortalOpen(true);
+        }}
         onOpenOwnerStudio={() => openOwnerTab(isOwner ? 'branding' : 'services')}
         onLogout={handleLogout}
       />
 
-      {/* Main Content Flow */}
+      {/* Main Content Flow (Strictly Zero 3D/2D Characters Anywhere) */}
       <main className="relative z-10">
         <HeroSection
           hero={cmsData.hero}
-          character={cmsData.character}
+          voiceConfig={cmsData.voice}
           primaryColor={cmsData.theme.primaryAccent}
           secondaryColor={cmsData.theme.secondaryAccent}
           isOwner={isOwner}
+          onVoiceConfigChange={handleVoiceConfigChange}
           onExploreWork={() => scrollToSection('#projects')}
-          onStartOrder={() => scrollToSection('#order')}
-          onEditCharacter={() => openOwnerTab('character')}
+          onStartOrder={() => scrollToSection('#services')}
+          onOpenVoiceCMS={() => openOwnerTab('voice')}
         />
 
         <ServicesSection
           services={cmsData.services}
           theme={cmsData.theme}
+          cart={cart}
           headingPrefix={cmsData.hero.servicesHeadingPrefix}
           headingHighlight={cmsData.hero.servicesHeadingHighlight}
           subheading={cmsData.hero.servicesSubheading}
           isOwner={isStaff}
+          onAddToCart={handleAddToCart}
           onSelectServiceForQuote={handleSelectServiceForOrder}
           onManageServices={() => openOwnerTab('services')}
         />
@@ -175,12 +260,15 @@ export function App() {
           hero={cmsData.hero}
           theme={cmsData.theme}
           services={cmsData.services}
+          cart={cart}
+          onUpdateCartQty={handleUpdateCartQty}
+          onClearCart={handleClearCart}
           preselectedService={selectedServiceForQuote}
           currentUser={currentUser}
         />
       </main>
 
-      {/* Unified Sign-In Modal (Google OAuth + Remember Me + Eye Toggles + Multi-Role Elevation) */}
+      {/* Frictionless Direct Google Login + Unified Sign-In Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -192,21 +280,27 @@ export function App() {
         profileIconUrl={cmsData.branding.profileIconUrl}
       />
 
-      {/* Sleek Client Portal */}
+      {/* Pure Frosted Glass Shopping & Client Portal */}
       {currentUser && currentUser.role === 'client' && (
         <ClientPortalModal
           isOpen={clientPortalOpen}
+          initialTab={clientPortalTab}
           onClose={() => setClientPortalOpen(false)}
           user={currentUser}
+          cart={cart}
+          onAddToCart={handleAddToCart}
+          onUpdateCartQty={handleUpdateCartQty}
+          onClearCart={handleClearCart}
           services={cmsData.services}
           projects={cmsData.projects}
           allOrders={orders}
           onUserUpdated={setCurrentUser}
           primaryColor={cmsData.theme.primaryAccent}
+          secondaryColor={cmsData.theme.secondaryAccent}
         />
       )}
 
-      {/* Multi-Tier Master Owner & Restricted Sub-Admin CMS Dashboard */}
+      {/* Multi-Tier Master Owner & Sub-Admin CMS Panel */}
       {currentUser && isStaff && (
         <AdminCustomizationPanel
           isOpen={ownerStudioOpen}

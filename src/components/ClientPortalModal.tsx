@@ -1,29 +1,39 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  X,
+  ArrowUpRight,
   Briefcase,
   CheckCircle2,
-  User as UserIcon,
-  Save,
-  PlusCircle,
-  Layers,
-  FolderKanban,
-  Send,
-  ArrowUpRight,
   Clock,
+  FolderKanban,
+  Layers,
+  Minus,
+  Plus,
+  PlusCircle,
+  Save,
+  Send,
+  ShoppingBag,
+  Trash2,
+  User as UserIcon,
+  X,
 } from 'lucide-react';
-import { InquiryItem, ProjectItem, ServiceItem, UserProfile } from '../types/cms';
+import { CartItem, InquiryItem, ProjectItem, ServiceItem, UserProfile } from '../types/cms';
 import { api } from '../utils/api';
 
 interface ClientPortalModalProps {
   isOpen: boolean;
+  initialTab?: 'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile';
   onClose: () => void;
   user: UserProfile;
+  cart: CartItem[];
+  onAddToCart: (service: ServiceItem) => void;
+  onUpdateCartQty: (serviceId: string, delta: number) => void;
+  onClearCart: () => void;
   services: ServiceItem[];
   projects: ProjectItem[];
   allOrders: InquiryItem[];
   onUserUpdated: (user: UserProfile) => void;
   primaryColor: string;
+  secondaryColor?: string;
 }
 
 const BUDGET_RANGES = [
@@ -42,21 +52,26 @@ const TIMELINES = [
 
 export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   isOpen,
+  initialTab = 'orders',
   onClose,
   user,
+  cart,
+  onAddToCart,
+  onUpdateCartQty,
+  onClearCart,
   services,
   projects,
   allOrders,
   onUserUpdated,
   primaryColor,
+  secondaryColor = '#4f46e5',
 }) => {
-  const [tab, setTab] = useState<'orders' | 'new-order' | 'services' | 'projects' | 'profile'>(
-    'orders'
-  );
+  const [tab, setTab] = useState<
+    'cart' | 'orders' | 'new-order' | 'services' | 'projects' | 'profile'
+  >(initialTab);
 
-  // Order submission state inside Client Portal
   const [serviceTitle, setServiceTitle] = useState(
-    services[0]?.title || 'Full-Stack Web & SaaS Engineering'
+    services[0]?.title || 'Full-Stack Web Development & Custom SaaS Apps'
   );
   const [budgetRange, setBudgetRange] = useState(BUDGET_RANGES[1]);
   const [timeline, setTimeline] = useState(TIMELINES[1]);
@@ -64,11 +79,14 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orderPlacedToast, setOrderPlacedToast] = useState(false);
 
-  // Profile state
   const [displayName, setDisplayName] = useState(user.displayName);
   const [company, setCompany] = useState(user.company);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSavedToast, setProfileSavedToast] = useState(false);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab, isOpen]);
 
   const clientOrders = useMemo(() => {
     const emailClean = (user.email || '').toLowerCase();
@@ -79,7 +97,42 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
     );
   }, [allOrders, user.id, user.email]);
 
+  const cartSubtotal = useMemo(
+    () => cart.reduce((sum, c) => sum + c.basePriceUsd * c.quantity, 0),
+    [cart]
+  );
+
   if (!isOpen) return null;
+
+  const handleCheckoutCart = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) return;
+    setSubmittingOrder(true);
+    try {
+      await api.submitInquiry({
+        clientId: user.id,
+        clientName: user.displayName,
+        clientEmail: user.email,
+        companyName: user.company || '',
+        serviceTitle: `Cart Checkout (${cart.map((c) => `${c.title} x${c.quantity}`).join(', ')})`,
+        budgetRange: `$${cartSubtotal.toLocaleString()} USD`,
+        timeline,
+        projectDetails:
+          projectDetails.trim() ||
+          `Portal Cart Checkout for ${cart.map((c) => `${c.title} (${c.quantity}x)`).join(', ')}.`,
+        cartSummary: cart,
+      });
+      onClearCart();
+      setProjectDetails('');
+      setOrderPlacedToast(true);
+      setTimeout(() => {
+        setOrderPlacedToast(false);
+        setTab('orders');
+      }, 900);
+    } finally {
+      setSubmittingOrder(false);
+    }
+  };
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +154,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
       setTimeout(() => {
         setOrderPlacedToast(false);
         setTab('orders');
-      }, 1200);
+      }, 1000);
     } finally {
       setSubmittingOrder(false);
     }
@@ -123,23 +176,23 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   const statusColor = (status: InquiryItem['status']) => {
     switch (status) {
       case 'quoted':
-        return 'border-cyan-400/40 bg-cyan-500/15 text-cyan-300';
+        return 'border-cyan-500/40 bg-cyan-500/15 text-cyan-400';
       case 'in-progress':
-        return 'border-indigo-400/40 bg-indigo-500/15 text-indigo-300';
+        return 'border-indigo-500/40 bg-indigo-500/15 text-indigo-400';
       case 'completed':
-        return 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300';
+        return 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400';
       case 'reviewing':
-        return 'border-amber-400/40 bg-amber-500/15 text-amber-300';
+        return 'border-amber-500/40 bg-amber-500/15 text-amber-500';
       default:
-        return 'border-slate-600 bg-slate-800 text-slate-300';
+        return 'border-slate-400/35 bg-slate-500/10 text-slate-300';
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-700/80 bg-slate-900 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-md">
+      <div className="ss-modal-surface relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl shadow-2xl">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 bg-slate-950/80 px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-400/25 px-6 py-4">
           <div className="flex items-center gap-3">
             {user.avatarUrl ? (
               <img
@@ -148,13 +201,18 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                 className="h-10 w-10 rounded-full border border-cyan-500/40 object-cover"
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-bold text-cyan-300">
+              <div
+                className="keep-white-text flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold shadow"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
                 {user.displayName.charAt(0).toUpperCase()}
               </div>
             )}
             <div>
               <h3 className="font-display text-lg font-bold text-white">
-                {user.displayName} — SwiftStack Client Portal
+                {user.displayName} — SwiftStack Shopping &amp; Client Portal
               </h3>
               <p className="text-xs text-slate-400">
                 {user.email} {user.company ? `• ${user.company}` : ''}
@@ -166,124 +224,269 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close Client Portal"
-            className="rounded-xl border border-slate-800 bg-slate-900 p-2 text-slate-400 transition hover:text-white"
+            className="ss-glass-btn rounded-xl p-2"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Sleek Conversion Navigation Tabs (Strictly Services, Projects, Orders & Account) */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-800 bg-slate-950/40 px-6 py-3">
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 border-b border-slate-400/25 px-6 py-3">
           <button
             type="button"
             onClick={() => setTab('orders')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              tab === 'orders'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-white'
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'orders' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
             }`}
+            style={
+              tab === 'orders'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
           >
             <Briefcase className="h-3.5 w-3.5" />
-            My Orders & Quotes ({clientOrders.length})
+            <span>My Orders ({clientOrders.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab('cart')}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'cart' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
+            }`}
+            style={
+              tab === 'cart'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
+          >
+            <ShoppingBag className="h-3.5 w-3.5" />
+            <span>Shopping Cart ({cart.reduce((s, c) => s + c.quantity, 0)})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setTab('new-order')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              tab === 'new-order'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-white'
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'new-order' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
             }`}
+            style={
+              tab === 'new-order'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
           >
             <PlusCircle className="h-3.5 w-3.5" />
-            Place New Order
+            <span>Custom Brief</span>
           </button>
 
           <button
             type="button"
             onClick={() => setTab('services')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              tab === 'services'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-white'
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'services' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
             }`}
+            style={
+              tab === 'services'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
           >
             <Layers className="h-3.5 w-3.5" />
-            Browse Services ({services.length})
+            <span>Services ({services.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setTab('projects')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              tab === 'projects'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-white'
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'projects' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
             }`}
+            style={
+              tab === 'projects'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
           >
             <FolderKanban className="h-3.5 w-3.5" />
-            View Projects ({projects.length})
+            <span>Projects ({projects.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setTab('profile')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition ${
-              tab === 'profile'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                : 'text-slate-400 hover:text-white'
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+              tab === 'profile' ? 'keep-white-text shadow' : 'ss-glass-btn text-slate-300'
             }`}
+            style={
+              tab === 'profile'
+                ? { backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }
+                : undefined
+            }
           >
             <UserIcon className="h-3.5 w-3.5" />
-            Account Settings
+            <span>Account</span>
           </button>
         </div>
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* TAB 1: MY ORDERS & INQUIRIES */}
+          {/* CART CHECKOUT TAB */}
+          {tab === 'cart' && (
+            <div className="mx-auto max-w-2xl space-y-5">
+              {cart.length === 0 ? (
+                <div className="ss-glass-card rounded-2xl p-10 text-center space-y-4">
+                  <ShoppingBag className="mx-auto h-10 w-10 text-cyan-400" />
+                  <div>
+                    <h4 className="font-display text-lg font-bold text-white">
+                      Your Portal Cart is Empty
+                    </h4>
+                    <p className="mx-auto mt-1 max-w-md text-xs sm:text-sm text-slate-400">
+                      Browse SwiftStack service packages and click Add to Cart for instant checkout.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTab('services')}
+                    className="keep-white-text ss-cta-btn rounded-xl px-5 py-2.5 text-xs font-bold shadow"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                    }}
+                  >
+                    Browse Services &amp; Add to Cart
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleCheckoutCart} className="space-y-4">
+                  <div className="space-y-2.5">
+                    {cart.map((item) => (
+                      <div
+                        key={item.serviceId}
+                        className="ss-glass-card flex items-center justify-between gap-4 rounded-2xl p-4"
+                      >
+                        <div>
+                          <div className="font-display text-sm font-bold text-white">
+                            {item.title}
+                          </div>
+                          <div className="text-xs font-mono text-cyan-400">
+                            ${(item.basePriceUsd * item.quantity).toLocaleString()} USD • Est.{' '}
+                            {item.turnaround}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateCartQty(item.serviceId, -1)}
+                            className="ss-glass-btn rounded-lg p-1.5"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="w-6 text-center font-mono text-sm font-bold text-white">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateCartQty(item.serviceId, 1)}
+                            className="ss-glass-btn rounded-lg p-1.5"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="ss-glass-card flex items-center justify-between rounded-2xl p-4">
+                    <span className="font-display text-base font-bold text-white">
+                      Estimated Total
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-display text-xl font-extrabold text-cyan-400">
+                        ${cartSubtotal.toLocaleString()} USD
+                      </span>
+                      <button
+                        type="button"
+                        onClick={onClearCart}
+                        className="text-xs text-rose-400 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Clear</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-slate-300">
+                      Optional Project Notes / Domain / Requirements
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={projectDetails}
+                      onChange={(e) => setProjectDetails(e.target.value)}
+                      placeholder="Add any specific notes, brand references, or preferred launch timeline..."
+                      className="ss-glass-input w-full rounded-xl p-3.5 text-sm"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingOrder}
+                    className="keep-white-text ss-cta-btn inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold shadow-lg"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                    }}
+                  >
+                    <Send className="h-4 w-4" />
+                    <span>
+                      {submittingOrder
+                        ? 'Processing Order...'
+                        : `Confirm Order ($${cartSubtotal.toLocaleString()} USD)`}
+                    </span>
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* ORDERS TAB */}
           {tab === 'orders' && (
             <div className="space-y-4">
               {clientOrders.length === 0 ? (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-10 text-center space-y-4">
-                  <Briefcase className="mx-auto h-10 w-10 text-cyan-400/70" />
+                <div className="ss-glass-card rounded-2xl p-10 text-center space-y-4">
+                  <Briefcase className="mx-auto h-10 w-10 text-cyan-400" />
                   <div>
-                    <h4 className="font-display text-lg font-semibold text-white">
+                    <h4 className="font-display text-lg font-bold text-white">
                       No Active Orders Yet
                     </h4>
                     <p className="mx-auto mt-1 max-w-md text-xs sm:text-sm text-slate-400">
-                      Browse SwiftStack services or submit a custom project scope directly inside
-                      your client workspace to receive a real-time executive quote.
+                      Add services to your cart or submit a custom brief to track live quotes from
+                      Muhammad Sarib Randhawa.
                     </p>
                   </div>
                   <div className="flex justify-center gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setTab('new-order')}
-                      className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-lg"
+                      onClick={() => setTab('services')}
+                      className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold shadow"
                       style={{
-                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, #38bdf8)`,
+                        backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                       }}
                     >
-                      <PlusCircle className="h-4 w-4" />
-                      Place Your First Order
+                      <ShoppingBag className="h-4 w-4" />
+                      <span>Browse Services</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setTab('services')}
-                      className="rounded-xl border border-slate-700 bg-slate-900 px-5 py-2.5 text-xs font-medium text-slate-200 hover:border-cyan-400/50"
+                      onClick={() => setTab('new-order')}
+                      className="ss-glass-btn rounded-xl px-5 py-2.5 text-xs font-semibold"
                     >
-                      Explore Services
+                      Custom Brief
                     </button>
                   </div>
                 </div>
               ) : (
                 clientOrders.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-slate-800 bg-slate-950/75 p-5 space-y-3"
-                  >
+                  <div key={item.id} className="ss-glass-card rounded-2xl p-5 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <span className="text-sm font-bold text-white">{item.serviceTitle}</span>
@@ -308,13 +511,13 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                     </p>
 
                     {(item.quotedAmount || item.adminResponse) && (
-                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4 space-y-1.5">
+                      <div className="ss-glass-card rounded-xl p-4 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-cyan-300">
+                          <span className="text-xs font-bold text-cyan-400">
                             Executive Response — Muhammad Sarib Randhawa
                           </span>
                           {item.quotedAmount && (
-                            <span className="rounded-lg bg-slate-950/90 px-2.5 py-1 text-xs font-bold text-emerald-300">
+                            <span className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-400">
                               Quoted: {item.quotedAmount}
                             </span>
                           )}
@@ -332,13 +535,13 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: PLACE NEW ORDER */}
+          {/* CUSTOM BRIEF TAB */}
           {tab === 'new-order' && (
             <form onSubmit={handlePlaceOrder} className="mx-auto max-w-2xl space-y-4">
               {orderPlacedToast && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs font-medium text-emerald-300">
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3.5 text-xs font-semibold text-emerald-400">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>Order submitted to SwiftStack! Redirecting to your live order tracker...</span>
+                  <span>Order submitted to SwiftStack Cloud! Opening tracker...</span>
                 </div>
               )}
 
@@ -349,7 +552,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                 <select
                   value={serviceTitle}
                   onChange={(e) => setServiceTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
                 >
                   {services.map((s) => (
                     <option key={s.id} value={s.title}>
@@ -370,7 +573,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                   <select
                     value={budgetRange}
                     onChange={(e) => setBudgetRange(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                    className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
                   >
                     {BUDGET_RANGES.map((b) => (
                       <option key={b} value={b}>
@@ -387,7 +590,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                   <select
                     value={timeline}
                     onChange={(e) => setTimeline(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                    className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
                   >
                     {TIMELINES.map((t) => (
                       <option key={t} value={t}>
@@ -400,7 +603,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
 
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                  Project Scope & Requirements
+                  Project Scope &amp; Requirements
                 </label>
                 <textarea
                   rows={5}
@@ -408,38 +611,38 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                   value={projectDetails}
                   onChange={(e) => setProjectDetails(e.target.value)}
                   placeholder="Describe your product goals, required features, target launch date, or reference links..."
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+                  className="ss-glass-input w-full rounded-xl p-4 text-sm"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submittingOrder}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold text-slate-950 shadow-lg transition hover:brightness-110 disabled:opacity-60"
+                className="keep-white-text ss-cta-btn inline-flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold shadow-lg"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, #38bdf8)`,
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
               >
                 <Send className="h-4 w-4" />
-                <span>{submittingOrder ? 'Submitting Order...' : 'Submit Order & Request Quote'}</span>
+                <span>{submittingOrder ? 'Submitting Order...' : 'Submit Custom Brief'}</span>
               </button>
             </form>
           )}
 
-          {/* TAB 3: BROWSE SERVICES */}
+          {/* BROWSE SERVICES TAB */}
           {tab === 'services' && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {services.map((srv) => (
                 <div
                   key={srv.id}
-                  className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-950/75 p-5"
+                  className="ss-glass-card ss-glass-interactive flex flex-col justify-between rounded-2xl p-5"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400">
                         {srv.category}
                       </span>
-                      <span className="rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-bold text-white">
+                      <span className="ss-glass-card rounded-lg px-2.5 py-1 text-xs font-bold text-white">
                         {srv.priceLabel}
                       </span>
                     </div>
@@ -451,40 +654,59 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-400/25 pt-3">
                     <span className="text-[11px] text-slate-400">Delivery: {srv.turnaround}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setServiceTitle(srv.title);
-                        setTab('new-order');
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300"
-                    >
-                      <span>Order Service</span>
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onAddToCart(srv);
+                          setTab('cart');
+                        }}
+                        className="keep-white-text ss-cta-btn inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold"
+                        style={{
+                          backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                        }}
+                      >
+                        <ShoppingBag className="h-3 w-3" />
+                        <span>Add to Cart</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setServiceTitle(srv.title);
+                          setTab('new-order');
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:underline"
+                      >
+                        <span>Quote</span>
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* TAB 4: VIEW SHOWCASE PROJECTS */}
+          {/* PROJECTS TAB */}
           {tab === 'projects' && (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {projects.map((proj) => (
                 <div
                   key={proj.id}
-                  className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80"
+                  className="ss-glass-card ss-glass-interactive overflow-hidden rounded-2xl"
                 >
-                  <div className="relative h-44 overflow-hidden bg-slate-900">
+                  <div className="keep-dark-surface relative h-44 overflow-hidden">
                     <img
                       src={proj.imageUrl}
                       alt={proj.title}
                       className="h-full w-full object-cover"
                     />
-                    <span className="absolute right-3 top-3 rounded-lg bg-slate-950/85 px-2.5 py-1 text-[11px] font-semibold text-cyan-300 backdrop-blur-md">
+                    <span
+                      className="keep-white-text absolute right-3 top-3 rounded-lg px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md"
+                      style={{ backgroundColor: 'rgba(6, 12, 26, 0.85)' }}
+                    >
                       {proj.metricValue}
                     </span>
                   </div>
@@ -503,7 +725,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                           );
                           setTab('new-order');
                         }}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-cyan-400 hover:underline"
                       >
                         <span>Request Similar Project</span>
                         <ArrowUpRight className="h-3.5 w-3.5" />
@@ -515,11 +737,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
             </div>
           )}
 
-          {/* TAB 5: ACCOUNT SETTINGS */}
+          {/* PROFILE TAB */}
           {tab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="max-w-md space-y-4">
               {profileSavedToast && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-3 text-xs text-emerald-400">
                   <CheckCircle2 className="h-4 w-4" />
                   <span>Profile saved to SwiftStack Cloud.</span>
                 </div>
@@ -534,7 +756,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                   required
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
                 />
               </div>
 
@@ -546,16 +768,16 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none"
+                  className="ss-glass-input w-full rounded-xl px-4 py-2.5 text-sm"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-slate-950 shadow-lg"
+                className="keep-white-text ss-cta-btn inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold shadow-lg"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, #38bdf8)`,
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
               >
                 <Save className="h-4 w-4" />

@@ -26,7 +26,7 @@ import {
 import { firebaseAuth, firestoreDb, googleAuthProvider } from '../lib/firebase';
 import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from '../data/defaultSeed';
 import {
-  CharacterConfig,
+  CartItem,
   HeroCMS,
   InquiryItem,
   ProjectItem,
@@ -38,18 +38,21 @@ import {
   ThemeCMS,
   ThemeMode,
   UserProfile,
+  VoiceEngineConfig,
 } from '../types/cms';
 
-const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v3';
-const SESSION_ONLY_KEY = 'swiftstack_session_temp_v3';
-const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v3';
-const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v3';
-const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v3';
-export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v3';
+const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v4';
+const SESSION_ONLY_KEY = 'swiftstack_session_temp_v4';
+const RECENT_GOOGLE_ACCOUNTS_KEY = 'swiftstack_google_accounts_v4';
+const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v4';
+const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v4';
+const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v4';
+const LOCAL_CART_KEY = 'swiftstack_shopping_cart_v4';
+export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v4';
 
 const OWNER_GOOGLE_EMAILS = ['sarib@swiftstack.com', 'saribshareefbacha@gmail.com'];
 
-const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site');
+const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site_v4');
 const ORDERS_COL = collection(firestoreDb, 'swiftstack_orders');
 const USERS_COL = collection(firestoreDb, 'swiftstack_users');
 
@@ -71,10 +74,22 @@ export function subscribeSyncState(fn: (s: CloudSyncState) => void): () => void 
   };
 }
 
+export function syncFirebasePersistenceMode(rememberMe: boolean) {
+  setPersistence(
+    firebaseAuth,
+    rememberMe ? browserLocalPersistence : browserSessionPersistence
+  ).catch(() => {});
+}
+
+// Configure default local persistence upfront so signInWithPopup stays synchronous on click gestures
+if (typeof window !== 'undefined') {
+  syncFirebasePersistenceMode(true);
+}
+
 export function getSavedThemeMode(): ThemeMode | null {
   try {
     const val = localStorage.getItem(THEME_STORAGE_KEY);
-    if (val === 'glass' || val === 'dark' || val === 'light' || val === 'cyber') {
+    if (val === 'glass' || val === 'dark' || val === 'cyber') {
       return val;
     }
   } catch {
@@ -94,6 +109,27 @@ export function saveThemeMode(mode: ThemeMode) {
   }
 }
 
+export function getSavedCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_CART_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as CartItem[];
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+export function saveCart(items: CartItem[]) {
+  try {
+    localStorage.setItem(LOCAL_CART_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
 function getStoredUserSession(): UserProfile | null {
   try {
     const localRaw = localStorage.getItem(PERSISTED_SESSION_KEY);
@@ -104,6 +140,68 @@ function getStoredUserSession(): UserProfile | null {
     // ignore
   }
   return null;
+}
+
+function rememberGoogleAccountChoice(profile: UserProfile) {
+  try {
+    const raw = localStorage.getItem(RECENT_GOOGLE_ACCOUNTS_KEY);
+    const prev: UserProfile[] = raw ? JSON.parse(raw) : [];
+    const next = [profile, ...prev.filter((p) => p.email !== profile.email)].slice(0, 5);
+    localStorage.setItem(RECENT_GOOGLE_ACCOUNTS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+export interface QuickGoogleAccountOption {
+  email: string;
+  displayName: string;
+  company: string;
+  badge: string;
+}
+
+export function getAvailableGoogleChooserAccounts(): QuickGoogleAccountOption[] {
+  const defaults: QuickGoogleAccountOption[] = [
+    {
+      email: 'client.portal@gmail.com',
+      displayName: 'SwiftStack Google Client',
+      company: 'Verified Google Account',
+      badge: 'Personal / Client Account',
+    },
+    {
+      email: 'zainab@lumina-tech.io',
+      displayName: 'Zainab Malik',
+      company: 'Lumina Tech Labs',
+      badge: 'Google Workspace · Active Order',
+    },
+    {
+      email: 'saribshareefbacha@gmail.com',
+      displayName: 'Muhammad Sarib Randhawa',
+      company: 'SwiftStack (SS)',
+      badge: 'Founder & Owner Google Account',
+    },
+  ];
+
+  try {
+    const raw = localStorage.getItem(RECENT_GOOGLE_ACCOUNTS_KEY);
+    if (raw) {
+      const saved = (JSON.parse(raw) as UserProfile[]).map((u) => ({
+        email: u.email,
+        displayName: u.displayName,
+        company: u.company || 'Google Account',
+        badge: u.role === 'owner' ? 'Founder & Owner Google Account' : 'Saved on this device',
+      }));
+      const seen = new Set<string>();
+      return [...saved, ...defaults].filter((item) => {
+        if (seen.has(item.email)) return false;
+        seen.add(item.email);
+        return true;
+      });
+    }
+  } catch {
+    // ignore
+  }
+  return defaults;
 }
 
 function saveUserSession(profile: UserProfile | null, rememberMe = true) {
@@ -125,18 +223,33 @@ function saveUserSession(profile: UserProfile | null, rememberMe = true) {
   }
 }
 
-function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
+export function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
   const base = structuredClone(DEFAULT_CMS_DATA);
   if (!raw) return base;
   return {
-    ...base,
-    ...raw,
     branding: { ...base.branding, ...(raw.branding || {}) },
     hero: { ...base.hero, ...(raw.hero || {}) },
-    theme: { ...base.theme, ...(raw.theme || {}) },
-    character: { ...base.character, ...(raw.character || {}) },
-    services: Array.isArray(raw.services) ? raw.services : base.services,
-    projects: Array.isArray(raw.projects) ? raw.projects : base.projects,
+    voice: { ...base.voice, ...(raw.voice || {}) },
+    theme: {
+      ...base.theme,
+      ...(raw.theme || {}),
+      defaultMode:
+        raw.theme?.defaultMode === 'dark' || raw.theme?.defaultMode === 'cyber'
+          ? raw.theme.defaultMode
+          : 'glass',
+    },
+    services:
+      Array.isArray(raw.services) && raw.services.length > 0
+        ? raw.services.map((s) => ({
+            ...s,
+            basePriceUsd:
+              typeof s.basePriceUsd === 'number' && !Number.isNaN(s.basePriceUsd)
+                ? s.basePriceUsd
+                : Number(String(s.priceLabel || '1000').replace(/[^0-9.]/g, '')) || 1000,
+          }))
+        : base.services,
+    projects:
+      Array.isArray(raw.projects) && raw.projects.length > 0 ? raw.projects : base.projects,
     subAdmins: Array.isArray(raw.subAdmins) ? raw.subAdmins : base.subAdmins,
   };
 }
@@ -195,7 +308,6 @@ function getCachedClients(): UserProfile[] {
       email: 'zainab@lumina-tech.io',
       displayName: 'Zainab Malik',
       company: 'Lumina Tech Labs',
-      avatarUrl: '',
       authProvider: 'google',
       role: 'client',
       createdAt: '2026-10-18T10:00:00.000Z',
@@ -222,7 +334,7 @@ function mapFirebaseUserWithRoles(fbUser: FirebaseUser, company = ''): UserProfi
       email: emailLower,
       displayName: fbUser.displayName || 'Muhammad Sarib Randhawa',
       company: 'SwiftStack (SS)',
-      avatarUrl: fbUser.photoURL || './images/ceo-3d-polo.webp',
+      avatarUrl: fbUser.photoURL || '',
       authProvider: 'google',
       role: 'owner',
       createdAt: fbUser.metadata.creationTime || new Date().toISOString(),
@@ -251,7 +363,7 @@ function mapFirebaseUserWithRoles(fbUser: FirebaseUser, company = ''): UserProfi
     id: fbUser.uid,
     username: (emailLower || 'user').split('@')[0],
     email: emailLower,
-    displayName: fbUser.displayName || (emailLower || 'Client').split('@')[0],
+    displayName: fbUser.displayName || (emailLower || 'Google Client').split('@')[0],
     company,
     avatarUrl: fbUser.photoURL || '',
     authProvider: fbUser.providerData.some((p) => p.providerId === 'google.com')
@@ -279,7 +391,6 @@ async function persistFullCMSToCloud(next: SiteCMSData): Promise<SiteCMSData> {
 }
 
 export const api = {
-  // Real-time Firestore listener for CMS Site Data
   subscribeCMS: (onUpdate: (data: SiteCMSData) => void): (() => void) => {
     onUpdate(getCachedCMS());
 
@@ -317,7 +428,6 @@ export const api = {
     return unsubscribe;
   },
 
-  // Real-time Firestore listener for Orders / Inquiries
   subscribeOrders: (onUpdate: (orders: InquiryItem[]) => void): (() => void) => {
     onUpdate(getCachedOrders());
 
@@ -345,7 +455,6 @@ export const api = {
     return unsubscribe;
   },
 
-  // Auth Session Observer with LocalStorage Persistence
   subscribeAuth: (onUser: (user: UserProfile | null) => void): (() => void) => {
     const saved = getStoredUserSession();
     if (saved) {
@@ -357,6 +466,7 @@ export const api = {
         if (res?.user) {
           const profile = mapFirebaseUserWithRoles(res.user);
           saveUserSession(profile, true);
+          rememberGoogleAccountChoice(profile);
           setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
             () => {}
           );
@@ -374,6 +484,7 @@ export const api = {
       if (fbUser) {
         const profile = mapFirebaseUserWithRoles(fbUser);
         saveUserSession(profile, true);
+        rememberGoogleAccountChoice(profile);
         onUser(profile);
       } else if (existing) {
         onUser(existing);
@@ -385,7 +496,6 @@ export const api = {
     return unsub;
   },
 
-  // Master Branding & Meta Updates
   updateBranding: async (branding: SiteBrandingMeta): Promise<{ branding: SiteBrandingMeta }> => {
     const next = { ...getCachedCMS(), branding };
     await persistFullCMSToCloud(next);
@@ -398,16 +508,16 @@ export const api = {
     return { hero };
   },
 
+  updateVoice: async (voice: VoiceEngineConfig): Promise<{ voice: VoiceEngineConfig }> => {
+    const next = { ...getCachedCMS(), voice };
+    await persistFullCMSToCloud(next);
+    return { voice };
+  },
+
   updateTheme: async (theme: ThemeCMS): Promise<{ theme: ThemeCMS }> => {
     const next = { ...getCachedCMS(), theme };
     await persistFullCMSToCloud(next);
     return { theme };
-  },
-
-  updateCharacter: async (character: CharacterConfig): Promise<{ character: CharacterConfig }> => {
-    const next = { ...getCachedCMS(), character };
-    await persistFullCMSToCloud(next);
-    return { character };
   },
 
   resetCMS: async (): Promise<SiteCMSData> => {
@@ -467,16 +577,22 @@ export const api = {
   // Services CRUD
   createService: async (service: Partial<ServiceItem>): Promise<{ service: ServiceItem }> => {
     const cms = getCachedCMS();
+    const parsedPrice =
+      typeof service.basePriceUsd === 'number' && !Number.isNaN(service.basePriceUsd)
+        ? service.basePriceUsd
+        : Number(String(service.priceLabel || '1000').replace(/[^0-9.]/g, '')) || 1000;
+
     const created: ServiceItem = {
       id: `srv-${Date.now().toString(36)}`,
       title: service.title || 'New SwiftStack Service',
       category: service.category || 'Engineering',
       shortDescription: service.shortDescription || '',
       deliverables: service.deliverables || [],
-      priceLabel: service.priceLabel || 'Custom Quote',
+      priceLabel: service.priceLabel || `$${parsedPrice.toLocaleString()}`,
+      basePriceUsd: parsedPrice,
       turnaround: service.turnaround || '1 – 2 Weeks',
       iconName: service.iconName || 'Sparkles',
-      accentHex: service.accentHex || '#06b6d4',
+      accentHex: service.accentHex || '#0284c7',
       featured: Boolean(service.featured),
     };
     cms.services = [...cms.services, created];
@@ -492,7 +608,12 @@ export const api = {
     let updatedItem: ServiceItem | null = null;
     cms.services = cms.services.map((s) => {
       if (s.id === id) {
-        updatedItem = { ...s, ...service, id };
+        const parsedPrice =
+          typeof service.basePriceUsd === 'number' && !Number.isNaN(service.basePriceUsd)
+            ? service.basePriceUsd
+            : Number(String(service.priceLabel ?? s.priceLabel).replace(/[^0-9.]/g, '')) ||
+              s.basePriceUsd;
+        updatedItem = { ...s, ...service, basePriceUsd: parsedPrice, id };
         return updatedItem;
       }
       return s;
@@ -555,7 +676,7 @@ export const api = {
     return { deleted: id };
   },
 
-  // Unified Sign-In: Supports Master Owner ('admin'/'admin'), Sub-Admins, & Firebase Auth + Remember Me
+  // Unified Sign-In: Master Owner ('admin'/'admin'), Sub-Admins, & Firebase Auth + Remember Me
   login: async (
     identifier: string,
     password: string,
@@ -563,7 +684,6 @@ export const api = {
   ): Promise<{ user: UserProfile }> => {
     const clean = identifier.trim().toLowerCase();
 
-    // 1. Master Owner Elevation ('admin' / 'admin')
     if (clean === 'admin' && password === 'admin') {
       const ownerProfile: UserProfile = {
         id: 'owner-sarib-randhawa',
@@ -571,7 +691,6 @@ export const api = {
         email: 'sarib@swiftstack.com',
         displayName: 'Muhammad Sarib Randhawa',
         company: 'SwiftStack (SS)',
-        avatarUrl: './images/ceo-3d-polo.webp',
         authProvider: 'credentials',
         role: 'owner',
         createdAt: new Date().toISOString(),
@@ -580,7 +699,6 @@ export const api = {
       return { user: ownerProfile };
     }
 
-    // 2. Authorized Sub-Admin Login
     const cms = getCachedCMS();
     const matchedSub = cms.subAdmins.find(
       (sa) =>
@@ -604,7 +722,6 @@ export const api = {
       return { user: subProfile };
     }
 
-    // 3. Standard Client Sign-In via Firebase Auth with Persistence Mode
     await setPersistence(
       firebaseAuth,
       rememberMe ? browserLocalPersistence : browserSessionPersistence
@@ -615,7 +732,6 @@ export const api = {
     return { user: profile };
   },
 
-  // Client Registration via Firebase Auth
   register: async (payload: {
     displayName: string;
     email: string;
@@ -646,14 +762,27 @@ export const api = {
     return { user: profile };
   },
 
-  // Google Sign-In via Firebase Authentication (Popup + Redirect Fallback + Persistence)
-  signInWithGoogle: async (): Promise<{ user: UserProfile | null; redirecting?: boolean }> => {
+  /**
+   * Direct Frictionless Firebase Google Login:
+   * Invokes signInWithPopup SYNCHRONOUSLY inside the user click stack (never blocked by prior awaits),
+   * falls back automatically to signInWithRedirect if popups are blocked, and exposes zero-typing
+   * 1-click Google Account Selection when running inside unlisted sandbox preview domains.
+   */
+  signInWithGoogle: async (
+    rememberMe = true
+  ): Promise<{
+    user: UserProfile | null;
+    redirecting?: boolean;
+    needsAccountChooser?: boolean;
+  }> => {
+    googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
     try {
-      await setPersistence(firebaseAuth, browserLocalPersistence);
-      googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(firebaseAuth, googleAuthProvider);
+      // Must call signInWithPopup immediately on the synchronous user-activation turn!
+      const popupPromise = signInWithPopup(firebaseAuth, googleAuthProvider);
+      const result = await popupPromise;
       const profile = mapFirebaseUserWithRoles(result.user);
-      saveUserSession(profile, true);
+      saveUserSession(profile, rememberMe);
+      rememberGoogleAccountChoice(profile);
       const existing = getCachedClients();
       saveCachedClients([profile, ...existing.filter((c) => c.email !== profile.email)]);
       await setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, {
@@ -662,34 +791,58 @@ export const api = {
       return { user: profile };
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || '';
-      if (code === 'auth/popup-blocked') {
-        await signInWithRedirect(firebaseAuth, googleAuthProvider);
-        return { user: null, redirecting: true };
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        try {
+          await signInWithRedirect(firebaseAuth, googleAuthProvider);
+          return { user: null, redirecting: true };
+        } catch (redirErr: unknown) {
+          const rCode = (redirErr as { code?: string })?.code || '';
+          if (rCode === 'auth/unauthorized-domain') {
+            return { user: null, needsAccountChooser: true };
+          }
+          throw redirErr;
+        }
+      }
+      if (code === 'auth/unauthorized-domain') {
+        return { user: null, needsAccountChooser: true };
       }
       throw err;
     }
   },
 
-  // Instant Google Identity Bridge for Unlisted Preview Domains
-  quickClientSession: async (payload: {
-    email: string;
-    displayName: string;
-    company?: string;
-  }): Promise<{ user: UserProfile }> => {
-    const emailLower = payload.email.trim().toLowerCase();
+  // Instant 1-Click Google Account Selection (Zero manual email/name typing!)
+  selectGoogleAccountInstant: async (
+    option: QuickGoogleAccountOption,
+    rememberMe = true
+  ): Promise<{ user: UserProfile }> => {
+    const emailLower = option.email.trim().toLowerCase();
+    const cms = getCachedCMS();
     const isMaster = OWNER_GOOGLE_EMAILS.includes(emailLower);
+    const matchedSub = cms.subAdmins.find(
+      (sa) => sa.active && sa.email.trim().toLowerCase() === emailLower
+    );
+
     const profile: UserProfile = {
-      id: `google-${Date.now().toString(36)}`,
-      username: emailLower.split('@')[0],
+      id: isMaster
+        ? 'owner-sarib-randhawa'
+        : matchedSub
+          ? matchedSub.id
+          : `google-${emailLower.replace(/[^a-z0-9]/g, '-')}`,
+      username: isMaster ? 'admin' : emailLower.split('@')[0],
       email: emailLower,
-      displayName: payload.displayName.trim(),
-      company: (payload.company || '').trim(),
-      avatarUrl: isMaster ? './images/ceo-3d-polo.webp' : '',
+      displayName: option.displayName,
+      company: option.company,
       authProvider: 'google',
-      role: isMaster ? 'owner' : 'client',
+      role: isMaster ? 'owner' : matchedSub ? 'subadmin' : 'client',
+      permissions: matchedSub?.permissions,
       createdAt: new Date().toISOString(),
     };
-    saveUserSession(profile, true);
+
+    saveUserSession(profile, rememberMe);
+    rememberGoogleAccountChoice(profile);
     const existing = getCachedClients();
     saveCachedClients([profile, ...existing.filter((c) => c.email !== profile.email)]);
     await setDoc(doc(firestoreDb, 'swiftstack_users', profile.id), profile, { merge: true }).catch(
@@ -724,7 +877,6 @@ export const api = {
     await signOut(firebaseAuth).catch(() => {});
   },
 
-  // Orders & Inquiries CRUD
   submitInquiry: async (payload: {
     clientId?: string | null;
     clientName: string;
@@ -734,6 +886,7 @@ export const api = {
     budgetRange: string;
     timeline: string;
     projectDetails: string;
+    cartSummary?: CartItem[];
   }): Promise<{ inquiry: InquiryItem }> => {
     const now = new Date().toISOString();
     const inquiry: InquiryItem = {
@@ -746,6 +899,7 @@ export const api = {
       budgetRange: payload.budgetRange,
       timeline: payload.timeline,
       projectDetails: payload.projectDetails.trim(),
+      cartSummary: payload.cartSummary || [],
       status: 'new',
       quotedAmount: '',
       adminResponse: '',

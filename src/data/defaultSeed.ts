@@ -1,57 +1,26 @@
 import {
-  CharacterConfig,
-  CharacterPresetStyle,
   InquiryItem,
   SiteBrandingMeta,
   SiteCMSData,
   SubAdminAccount,
+  VoiceEngineConfig,
 } from '../types/cms';
 
-export interface CharacterFrameSet {
-  idle: string;
-  open: string;
-  wave?: string;
-}
-
-export const CHARACTER_PRESET_FRAMES: Record<CharacterPresetStyle, CharacterFrameSet> = {
-  'executive-polo': {
-    idle: './images/ceo-3d-polo.webp',
-    open: './images/ceo-3d-polo-open.webp',
-    wave: './images/ceo-3d-polo-wave.webp',
-  },
-  'midnight-blazer': {
-    idle: './images/ceo-3d-blazer.webp',
-    open: './images/ceo-3d-blazer-open.webp',
-  },
-  'tech-minimalist': {
-    idle: './images/ceo-3d-tech.webp',
-    open: './images/ceo-3d-tech-open.webp',
-  },
-};
-
-export const CHARACTER_PRESET_IMAGES: Record<CharacterPresetStyle, string> = {
-  'executive-polo': './images/ceo-3d-polo.webp',
-  'midnight-blazer': './images/ceo-3d-blazer.webp',
-  'tech-minimalist': './images/ceo-3d-tech.webp',
-};
-
 export const DEFAULT_BRANDING_META: SiteBrandingMeta = {
-  pageTitle: 'SwiftStack (SS) — Muhammad Sarib Randhawa | Digital Agency & Full-Stack Studio',
+  pageTitle: 'SwiftStack (SS) — Muhammad Sarib Randhawa | Digital Agency & Shopping Portal',
   metaDescription:
-    'SwiftStack (SS), founded and owned by Muhammad Sarib Randhawa — full-stack web & SaaS engineering, mobile apps, cloud security, and AI media creation.',
+    'SwiftStack (SS), founded and owned by Muhammad Sarib Randhawa — pure glassmorphic digital agency & service shopping portal for full-stack web, mobile apps, cloud SSL, and AI media.',
   faviconUrl: '',
   faviconMonogram: 'SS',
   profileIconUrl: '',
 };
 
-export const DEFAULT_CHARACTER_CONFIG: CharacterConfig = {
-  presetStyle: 'executive-polo',
-  customImageUrl: '',
-  greetingBadgeText: 'Founder & CEO · Live Studio',
-  gestureAnimation: 'subtle',
-  auraColor: '#06b6d4',
-  voiceRate: 1.0,
-  voicePitch: 1.02,
+export const DEFAULT_VOICE_CONFIG: VoiceEngineConfig = {
+  voiceGender: 'male',
+  speechFrequency: 0.96,
+  voicePitch: 1.0,
+  pakistaniAccentPhonetics: true,
+  preferredVoiceURI: '',
 };
 
 export const DEFAULT_SUB_ADMINS: SubAdminAccount[] = [
@@ -73,68 +42,67 @@ export const DEFAULT_SUB_ADMINS: SubAdminAccount[] = [
 
 export const DEFAULT_CMS_DATA: SiteCMSData = {
   branding: DEFAULT_BRANDING_META,
+  voice: DEFAULT_VOICE_CONFIG,
   hero: {
     companyName: 'SwiftStack',
     companyAbbreviation: 'SS',
-    badgeText: 'SWIFTSTACK (SS) · FULL-STACK, CLOUD & AI DIGITAL STUDIO',
-    headlinePrefix: 'Engineering High-Impact',
-    headlineHighlight: 'Web, Full-Stack & AI Solutions',
+    badgeText: 'SWIFTSTACK (SS) · DIGITAL AGENCY & CLOUD SHOPPING PORTAL',
+    headlinePrefix: 'Precision Engineering for',
+    headlineHighlight: 'Next-Gen Web, Cloud & AI Systems',
     subheadline:
-      'Founded and owned by Muhammad Sarib Randhawa, SwiftStack (SS) partners with ambitious brands and founders to ship fast full-stack web platforms, custom mobile apps, cloud infrastructure, and iconic AI-powered brand experiences.',
+      'Founded and owned by Muhammad Sarib Randhawa, SwiftStack (SS) delivers ultra-fast full-stack web platforms, custom mobile applications, automated cloud infrastructure, and iconic AI media experiences.',
     founderName: 'Muhammad Sarib Randhawa',
     founderTitle: 'Founder & CEO — SwiftStack (SS)',
     founderBio:
-      'At SwiftStack (SS), every product is engineered for conversion, speed, and unmistakable polish — spanning full-stack web & mobile apps, automated cloud & SSL deployments, minimalist brand systems, and flagship content channels like @SoulSyllables.',
+      'Every solution at SwiftStack (SS) is crafted with architectural discipline, sub-second speed, and crystal-clear UX — from bespoke SaaS ecosystems and signed Android APKs to flagship creative channels like @SoulSyllables.',
+    voiceStageLabel: 'EXECUTIVE AUDIO BRIEFING · PAKISTANI ENGLISH STUDIO ENGINE',
     voiceGreeting:
-      'Hi there! I am Muhammad Sarib Randhawa, Founder & CEO of SwiftStack. Welcome to our digital studio! Explore our full-stack web, mobile, cloud, and AI media services, check out our featured client projects, or submit your project brief right here to get started.',
-    primaryCtaLabel: 'Start Your Order',
-    secondaryCtaLabel: 'Explore Featured Work',
-    servicesHeadingPrefix: 'Full-Spectrum Engineering,',
-    servicesHeadingHighlight: 'Cloud Architecture & AI Media',
+      'Welcome to SwiftStack! I am Muhammad Sarib Randhawa, Founder and CEO of SwiftStack Digital Studio. Explore our full-stack web engineering, custom mobile apps, cloud security, and AI media packages — add any service straight to your portal cart, or request a tailored milestone quote today.',
+    primaryCtaLabel: 'Explore Services & Shop',
+    secondaryCtaLabel: 'View Featured Work',
+    servicesHeadingPrefix: 'Full-Spectrum Services &',
+    servicesHeadingHighlight: 'Instant Shopping Portal',
     servicesSubheading:
-      'Every engagement combines precision software engineering with clean visual direction — architected end-to-end under Muhammad Sarib Randhawa.',
-    projectsHeadingPrefix: 'Engineered by',
+      'Add individual engineering or AI media packages straight to your glass shopping cart, or request a tailored multi-milestone architecture quote directly from Muhammad Sarib Randhawa.',
+    projectsHeadingPrefix: 'Engineered & Shipped by',
     projectsHeadingHighlight: 'SwiftStack (SS)',
     projectsSubheading:
-      'Featured client builds across full-stack SaaS platforms, interactive web interfaces, signed mobile APKs, and flagship AI content ecosystems like @SoulSyllables.',
-    orderHeadingPrefix: 'Ready to Launch Something',
-    orderHeadingHighlight: 'Extraordinary?',
+      'Production-proven client platforms across interactive web commerce, multi-region cloud systems, mobile APKs, and flagship AI media ecosystems like @SoulSyllables.',
+    orderHeadingPrefix: 'Checkout Your Cart or',
+    orderHeadingHighlight: 'Commission a Custom Build',
     orderSubheading:
-      'Submit your project requirements, SaaS roadmap, mobile app scope, or AI media package. Muhammad Sarib Randhawa reviews every inquiry directly and responds with a tailored architecture and milestone quote.',
+      'Submit your selected service cart or custom project specification below. Every brief syncs live with your SwiftStack Client Portal for real-time status updates and executive quotes.',
     contactEmail: 'hello@swiftstack.com',
-    locationLabel: 'Global Digital Studio · Cloud-First Delivery',
+    locationLabel: 'Pakistan & Global Cloud Delivery',
     socialHandle: '@SoulSyllables',
   },
   theme: {
     defaultMode: 'glass',
-    backgroundHex: '#050c1d',
-    primaryAccent: '#06b6d4',
-    secondaryAccent: '#6366f1',
-    tertiaryAccent: '#22d3ee',
-    glassOpacity: 0.62,
-    particleDensity: 150,
-    scrollSpeed: 1.0,
-    wireframeOpacity: 0.18,
+    primaryAccent: '#0284c7',
+    secondaryAccent: '#4f46e5',
+    tertiaryAccent: '#06b6d4',
+    robotDensity: 9,
+    rippleIntensity: 1.0,
   },
-  character: DEFAULT_CHARACTER_CONFIG,
   subAdmins: DEFAULT_SUB_ADMINS,
   services: [
     {
       id: 'srv-3d-web',
-      title: 'Modern Front-End & Interactive Web Design',
+      title: 'Modern Front-End & Glassmorphic Web Design',
       category: 'Frontend & UI',
       shortDescription:
-        'Bespoke high-speed web interfaces built with HTML5, CSS3, TypeScript, React, and smooth motion graphics — engineered for crisp mobile responsiveness and conversion.',
+        'Bespoke high-speed web interfaces built with React, TypeScript, Tailwind CSS, and fluid motion physics — engineered for crystal clarity and conversion.',
       deliverables: [
         'React + TypeScript Architecture',
-        'Multi-Theme Glass & Light UI',
+        'Pure Frosted Glass & Multi-Theme UI',
         'Interactive Product Showcases',
         'Sub-Second Mobile Performance',
       ],
-      priceLabel: 'From $1,400',
+      priceLabel: '$1,400',
+      basePriceUsd: 1400,
       turnaround: '1 – 3 Weeks',
       iconName: 'Boxes',
-      accentHex: '#06b6d4',
+      accentHex: '#0284c7',
       featured: true,
     },
     {
@@ -142,17 +110,18 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       title: 'Full-Stack Web Development & Custom SaaS Apps',
       category: 'Engineering',
       shortDescription:
-        'Production-grade web platforms, SaaS applications, Firebase & SQL backends, and high-concurrency APIs engineered on Node.js, Python, and modern cloud databases.',
+        'Production-grade web platforms, shopping portals, Firebase & SQL backends, and high-concurrency APIs engineered on Node.js, Python, and cloud databases.',
       deliverables: [
         'Node.js, Python & Firebase Backends',
         'Firestore / PostgreSQL / SQLite',
-        'Google OAuth & Multi-Role Auth',
-        'Real-Time Client & Order Portals',
+        'Google OAuth & Multi-Role Portals',
+        'Real-Time Cart & Order Tracking',
       ],
-      priceLabel: 'From $2,200',
+      priceLabel: '$2,200',
+      basePriceUsd: 2200,
       turnaround: '2 – 5 Weeks',
       iconName: 'Code2',
-      accentHex: '#3b82f6',
+      accentHex: '#2563eb',
       featured: true,
     },
     {
@@ -167,10 +136,11 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
         'Push Notifications & Cloud Sync',
         'Play Store & Web Publishing',
       ],
-      priceLabel: 'From $1,600',
+      priceLabel: '$1,600',
+      basePriceUsd: 1600,
       turnaround: '2 – 4 Weeks',
       iconName: 'Smartphone',
-      accentHex: '#6366f1',
+      accentHex: '#4f46e5',
       featured: false,
     },
     {
@@ -185,10 +155,11 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
         'Global Edge CDN Caching',
         'Uptime Monitoring & Backups',
       ],
-      priceLabel: 'From $450',
+      priceLabel: '$450',
+      basePriceUsd: 450,
       turnaround: '24 – 72 Hours',
       iconName: 'CloudCog',
-      accentHex: '#0ea5e9',
+      accentHex: '#0891b2',
       featured: false,
     },
     {
@@ -203,10 +174,11 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
         'Interactive UI/UX Prototypes',
         'Reusable Design Component System',
       ],
-      priceLabel: 'From $750',
+      priceLabel: '$750',
+      basePriceUsd: 750,
       turnaround: '5 – 10 Days',
       iconName: 'Sparkles',
-      accentHex: '#8b5cf6',
+      accentHex: '#6366f1',
       featured: false,
     },
     {
@@ -214,17 +186,18 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       title: 'AI Photo/Video Creation, Automated Editing & Voiceovers',
       category: 'AI Media Studio',
       shortDescription:
-        'High-retention AI commercial imagery, automated video editing pipelines, click-magnet YouTube thumbnails, and lifelike studio voiceovers.',
+        'High-retention AI commercial imagery, automated video editing pipelines, click-magnet YouTube thumbnails, and natural studio voiceovers.',
       deliverables: [
         'AI Commercial Photo & Video Assets',
         'Automated Short/Long-Form Editing',
         'High-CTR YouTube Thumbnail Packs',
         'Studio Voiceovers & Audio Mastering',
       ],
-      priceLabel: 'From $550',
+      priceLabel: '$550',
+      basePriceUsd: 550,
       turnaround: '2 – 5 Days',
       iconName: 'Video',
-      accentHex: '#22d3ee',
+      accentHex: '#06b6d4',
       featured: true,
     },
     {
@@ -239,10 +212,11 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
         'Channel Direction (@SoulSyllables Model)',
         'Audience Analytics & Campaign Scaling',
       ],
-      priceLabel: 'From $900 / mo',
+      priceLabel: '$900 / mo',
+      basePriceUsd: 900,
       turnaround: 'Ongoing Retainer',
       iconName: 'Megaphone',
-      accentHex: '#38bdf8',
+      accentHex: '#0284c7',
       featured: true,
     },
   ],
@@ -255,7 +229,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       description:
         'Engineered a high-conversion interactive product configurator enabling enterprise buyers to inspect precision hardware, configure custom specs in real time, and submit instant orders.',
       imageUrl: './images/project-3d-commerce.jpg',
-      tags: ['React', 'Three.js', 'TypeScript', 'Tailwind CSS'],
+      tags: ['React', 'TypeScript', 'Glass UI', 'Tailwind CSS'],
       metricLabel: 'Conversion Lift',
       metricValue: '+285%',
       clientName: 'Pivotix Precision Systems',
@@ -301,7 +275,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       subtitle: 'High-Speed Fintech Mobile Experience, Custom APK & Web Portal',
       category: 'Mobile & APK',
       description:
-        'Designed and shipped a sleek dark-mode mobile application packaged with automated signed Android APK distribution, biometric UX, instant ledger sync, and matching web portal.',
+        'Designed and shipped a sleek mobile application packaged with automated signed Android APK distribution, biometric UX, instant ledger sync, and matching web portal.',
       imageUrl: './images/project-mobile-apk.jpg',
       tags: ['Mobile UI/UX', 'Signed APK Build', 'Firebase Auth', 'Cloud Sync'],
       metricLabel: 'Active Installs',
@@ -325,19 +299,19 @@ export const INITIAL_SAMPLE_INQUIRIES: InquiryItem[] = [
     budgetRange: '$3,000 – $7,500',
     timeline: '2 – 4 Weeks',
     projectDetails:
-      'Looking for a modern SaaS web platform with Google login, real-time order tracking, and clean dark glassmorphic UI.',
+      'Looking for a modern SaaS shopping portal with Google login, real-time order tracking, and pure transparent frosted glass UI.',
     status: 'quoted',
     quotedAmount: '$3,400 USD',
     adminResponse:
-      'Architecture blueprint ready — includes React frontend, Firebase Auth + Firestore backend, and SSL deployment.',
+      'Architecture blueprint ready — includes React glassmorphic frontend, Firebase Auth + Firestore backend, and SSL deployment.',
     createdAt: '2026-10-18T10:30:00.000Z',
     updatedAt: '2026-10-19T14:15:00.000Z',
   },
   {
     id: 'inq-seed-2',
     clientId: null,
-    clientName: 'Daniel Vance',
-    clientEmail: 'daniel@vancemedia.co',
+    clientName: 'Bilal Chaudhry',
+    clientEmail: 'bilal@vancemedia.pk',
     companyName: 'Vance Creative Group',
     serviceTitle: 'AI Photo/Video Creation, Automated Editing & Voiceovers',
     budgetRange: '$1,500 – $3,000',

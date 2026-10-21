@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import {
-  Menu,
-  X,
-  User,
-  LogOut,
-  Sparkles,
-  Sliders,
   Briefcase,
-  Sun,
-  Moon,
   Cpu,
   Layers,
+  LogOut,
+  Menu,
+  Moon,
+  ShoppingBag,
+  Sliders,
+  Sparkles,
+  User,
+  X,
 } from 'lucide-react';
-import { SwiftStackLogo } from './SwiftStackLogo';
 import { ThemeMode, UserProfile } from '../types/cms';
+import { SwiftStackLogo } from './SwiftStackLogo';
 
 interface NavbarProps {
   primaryColor: string;
@@ -23,6 +23,8 @@ interface NavbarProps {
   profileIconUrl: string;
   themeMode: ThemeMode;
   onChangeThemeMode: (mode: ThemeMode) => void;
+  cartCount: number;
+  onOpenCart: () => void;
   currentUser: UserProfile | null;
   activeOrdersCount?: number;
   onOpenAuth: () => void;
@@ -34,7 +36,6 @@ interface NavbarProps {
 const THEME_OPTIONS: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
   { id: 'glass', label: 'Glass', icon: <Layers className="h-3.5 w-3.5" /> },
   { id: 'dark', label: 'Dark', icon: <Moon className="h-3.5 w-3.5" /> },
-  { id: 'light', label: 'Light', icon: <Sun className="h-3.5 w-3.5" /> },
   { id: 'cyber', label: 'Cyber', icon: <Cpu className="h-3.5 w-3.5" /> },
 ];
 
@@ -46,6 +47,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   profileIconUrl,
   themeMode,
   onChangeThemeMode,
+  cartCount,
+  onOpenCart,
   currentUser,
   activeOrdersCount = 0,
   onOpenAuth,
@@ -56,9 +59,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'Services', href: '#services' },
+    { label: 'Services & Shop', href: '#services' },
     { label: 'Projects', href: '#projects' },
-    { label: 'Order & Quote', href: '#order' },
+    { label: 'Checkout & Quote', href: '#order' },
   ];
 
   const scrollTo = (id: string) => {
@@ -71,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 px-4 sm:px-8 pt-4">
-      <nav className="ss-glass-card mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl border px-5 py-3">
+      <nav className="ss-glass-card mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl px-5 py-3">
         <a
           href="#hero"
           onClick={(e) => {
@@ -95,20 +98,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               key={link.href}
               type="button"
               onClick={() => scrollTo(link.href)}
-              className="text-sm font-medium text-slate-300 transition hover:text-cyan-400"
+              className="text-sm font-semibold text-slate-300 transition hover:text-cyan-400"
             >
               {link.label}
             </button>
           ))}
         </div>
 
-        {/* Right Controls: 4-Mode Theme Engine + Unified Auth / Role Portal */}
+        {/* Right Controls: Glass Theme Switcher + Cart + Unified Auth */}
         <div className="hidden md:flex items-center gap-2.5">
-          {/* 4-Mode Multi-Theme Switcher */}
+          {/* Theme Mode Switcher */}
           <div
             role="group"
             aria-label="Theme Switcher"
-            className="flex items-center rounded-xl border border-slate-700/60 bg-slate-950/60 p-1"
+            className="ss-glass-card flex items-center rounded-xl p-1"
           >
             {THEME_OPTIONS.map((opt) => {
               const active = themeMode === opt.id;
@@ -118,9 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   type="button"
                   onClick={() => onChangeThemeMode(opt.id)}
                   className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition ${
-                    active
-                      ? 'keep-white-text shadow-sm'
-                      : 'text-slate-400 hover:text-white'
+                    active ? 'keep-white-text shadow-sm' : 'text-slate-400 hover:text-white'
                   }`}
                   style={
                     active
@@ -137,29 +138,48 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </div>
 
+          {/* Shopping Portal Cart Trigger */}
+          <button
+            type="button"
+            onClick={onOpenCart}
+            className="ss-glass-btn relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
+            aria-label="Shopping Cart"
+          >
+            <ShoppingBag className="h-4 w-4 text-cyan-400" />
+            <span>Cart</span>
+            {cartCount > 0 && (
+              <span
+                className="keep-white-text ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
+                {cartCount}
+              </span>
+            )}
+          </button>
+
           {currentUser ? (
             <>
               {isStaff ? (
                 <button
                   type="button"
                   onClick={onOpenOwnerStudio}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/50 bg-cyan-500/15 px-3.5 py-2 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/25"
+                  className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold text-cyan-400"
                 >
-                  <Sliders className="h-3.5 w-3.5" />
-                  <span>
-                    {currentUser.role === 'owner' ? 'Owner CMS' : 'Sub-Admin Portal'}
-                  </span>
+                  <Sliders className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>{currentUser.role === 'owner' ? 'Owner CMS' : 'Sub-Admin Portal'}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={onOpenPortal}
-                  className="ss-glass-card inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-medium text-slate-200 transition hover:border-cyan-400/40"
+                  className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold"
                 >
                   <Briefcase className="h-3.5 w-3.5 text-cyan-400" />
                   <span>{currentUser.displayName.split(' ')[0]}'s Portal</span>
                   {activeOrdersCount > 0 && (
-                    <span className="ml-0.5 rounded-full bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-bold text-cyan-300">
+                    <span className="ml-0.5 rounded-full bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-bold text-cyan-400">
                       {activeOrdersCount}
                     </span>
                   )}
@@ -170,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onLogout}
                 title="Sign Out"
-                className="ss-glass-card inline-flex items-center justify-center rounded-xl border p-2 text-slate-400 transition hover:border-rose-500/40 hover:text-rose-400"
+                className="ss-glass-btn inline-flex items-center justify-center rounded-xl p-2 text-slate-400 hover:text-rose-400"
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -180,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenAuth}
-                className="ss-glass-card inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold text-slate-200 transition hover:border-cyan-400/50"
+                className="ss-glass-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold"
               >
                 <User className="h-4 w-4 text-cyan-400" />
                 <span>Sign In</span>
@@ -189,34 +209,54 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={() => scrollTo('#order')}
-                className="keep-white-text inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-lg transition hover:opacity-95"
+                className="keep-white-text ss-cta-btn inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-lg"
                 style={{
                   backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Start Project</span>
+                <span>Start Order</span>
               </button>
             </>
           )}
         </div>
 
         {/* Mobile Menu Button */}
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle Menu"
-          className="ss-glass-card md:hidden rounded-xl border p-2 text-slate-200"
-        >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2 md:hidden">
+          <button
+            type="button"
+            onClick={onOpenCart}
+            className="ss-glass-btn relative rounded-xl p-2"
+            aria-label="Open Cart"
+          >
+            <ShoppingBag className="h-4 w-4 text-cyan-400" />
+            {cartCount > 0 && (
+              <span
+                className="keep-white-text absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle Menu"
+            className="ss-glass-btn rounded-xl p-2"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </nav>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Glass Drawer */}
       {mobileMenuOpen && (
-        <div className="ss-modal-surface mx-auto mt-2 max-w-7xl rounded-2xl border p-5 md:hidden space-y-4">
-          {/* Mobile Theme Switcher */}
-          <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-slate-700/50 bg-slate-950/50 p-1">
+        <div className="ss-modal-surface mx-auto mt-2 max-w-7xl rounded-2xl p-5 md:hidden space-y-4">
+          <div className="grid grid-cols-3 gap-1.5 rounded-xl border border-slate-400/25 p-1">
             {THEME_OPTIONS.map((opt) => {
               const active = themeMode === opt.id;
               return (
@@ -242,20 +282,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </div>
 
-          <div className="flex flex-col space-y-2">
+          <div className="flex flex-col space-y-1.5">
             {navLinks.map((link) => (
               <button
                 key={link.href}
                 type="button"
                 onClick={() => scrollTo(link.href)}
-                className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-200 hover:bg-slate-800/40"
+                className="rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-200 hover:bg-cyan-500/10"
               >
                 {link.label}
               </button>
             ))}
           </div>
 
-          <div className="border-t border-slate-700/40 pt-3 flex flex-col gap-2.5">
+          <div className="border-t border-slate-400/25 pt-3 flex flex-col gap-2.5">
             {currentUser ? (
               <>
                 {isStaff ? (
@@ -265,7 +305,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMobileMenuOpen(false);
                       onOpenOwnerStudio();
                     }}
-                    className="w-full rounded-xl border border-cyan-400/50 bg-cyan-500/15 py-2.5 text-center text-sm font-semibold text-cyan-300"
+                    className="ss-glass-btn w-full rounded-xl py-2.5 text-center text-sm font-bold text-cyan-400"
                   >
                     {currentUser.role === 'owner' ? 'Open Owner CMS' : 'Open Sub-Admin Portal'}
                   </button>
@@ -276,7 +316,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setMobileMenuOpen(false);
                       onOpenPortal();
                     }}
-                    className="ss-glass-card w-full rounded-xl border py-2.5 text-center text-sm font-semibold text-white"
+                    className="ss-glass-btn w-full rounded-xl py-2.5 text-center text-sm font-semibold"
                   >
                     Open Client Portal
                   </button>
@@ -287,7 +327,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setMobileMenuOpen(false);
                     onLogout();
                   }}
-                  className="w-full rounded-xl border border-slate-700/60 py-2 text-center text-xs text-rose-400"
+                  className="ss-glass-btn w-full rounded-xl py-2 text-center text-xs text-rose-400"
                 >
                   Sign Out
                 </button>
@@ -299,7 +339,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setMobileMenuOpen(false);
                   onOpenAuth();
                 }}
-                className="keep-white-text w-full rounded-xl py-2.5 text-center text-sm font-bold shadow"
+                className="keep-white-text ss-cta-btn w-full rounded-xl py-2.5 text-center text-sm font-bold shadow"
                 style={{
                   backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
