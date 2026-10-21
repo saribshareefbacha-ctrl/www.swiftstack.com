@@ -2,16 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion';
 import {
   ArrowUpRight,
-  CheckCircle2,
-  Gauge,
   Pause,
   Play,
   RotateCcw,
-  Sliders,
   Sparkles,
-  Volume2,
 } from 'lucide-react';
-import { HeroCMS, ThemeCMS, VoiceEngineConfig, VoiceGender } from '../types/cms';
+import {
+  HeroCMS,
+  RealTimeMetricItem,
+  ThemeCMS,
+  VoiceEngineConfig,
+} from '../types/cms';
 import {
   buildPakistaniSpeechMap,
   computeCalibratedVoiceParams,
@@ -21,18 +22,22 @@ import {
 
 interface HeroSectionProps {
   hero: HeroCMS;
+  metrics: RealTimeMetricItem[];
+  liveProjectsCount: number;
+  liveOrdersCount: number;
   theme: ThemeCMS;
   voice: VoiceEngineConfig;
-  onVoiceQuickChange: (patch: Partial<VoiceEngineConfig>) => void;
   onExploreServices: () => void;
   onStartOrder: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   hero,
+  metrics,
+  liveProjectsCount,
+  liveOrdersCount,
   theme,
   voice,
-  onVoiceQuickChange,
   onExploreServices,
   onStartOrder,
 }) => {
@@ -40,7 +45,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [activeVoiceLabel, setActiveVoiceLabel] = useState<string>('Pakistani English Calibrated');
 
   const stepTimeoutRef = useRef<number | null>(null);
   const currentWordRef = useRef<number>(-1);
@@ -78,16 +82,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     [availableVoices, voice.voiceGender, voice.preferredVoiceURI]
   );
 
-  useEffect(() => {
-    if (selectedVoiceInfo.voice) {
-      setActiveVoiceLabel(`${selectedVoiceInfo.voice.name} (${selectedVoiceInfo.voice.lang})`);
-    } else {
-      setActiveVoiceLabel(
-        `Pakistani English · ${voice.voiceGender === 'male' ? 'Male' : 'Female'} Synth`
-      );
-    }
-  }, [selectedVoiceInfo, voice.voiceGender]);
-
   const speechMap = useMemo(
     () =>
       buildPakistaniSpeechMap(
@@ -97,6 +91,27 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
       ),
     [hero.introSpeechText, voice.pakistaniAccentPhonetics, selectedVoiceInfo.isNativeSouthAsian]
   );
+
+  const computedMetrics = useMemo(() => {
+    return metrics.map((m) => {
+      if (m.liveAutoIncrement === 'projects_plus_orders' && typeof m.baseNumber === 'number') {
+        return {
+          ...m,
+          displayValue: `${m.baseNumber + liveProjectsCount + liveOrdersCount}${m.suffix ?? ''}`,
+        };
+      }
+      if (m.liveAutoIncrement === 'orders_count' && typeof m.baseNumber === 'number') {
+        return {
+          ...m,
+          displayValue: `${m.baseNumber + liveOrdersCount}${m.suffix ?? ''}`,
+        };
+      }
+      return {
+        ...m,
+        displayValue: m.value,
+      };
+    });
+  }, [metrics, liveProjectsCount, liveOrdersCount]);
 
   const clearWordTimer = useCallback(() => {
     if (stepTimeoutRef.current !== null) {
@@ -126,9 +141,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     (wordIndex: number) => {
       clearWordTimer();
       const total = speechMap.rawWords.length;
-      if (wordIndex >= total) {
-        return;
-      }
+      if (wordIndex >= total) return;
 
       currentWordRef.current = wordIndex;
       setActiveWordIndex(wordIndex);
@@ -196,7 +209,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           break;
         }
       }
-      // Re-anchor smoothly ONLY if speech boundary is pacing behind our timer so highlight NEVER races ahead
       if (matched < currentWordRef.current) {
         scheduleNextWordStep(matched);
       }
@@ -220,10 +232,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
     setIsPlaying(true);
     setIsPaused(false);
-    // Slight initial breath offset before word 0 lights up so audio utterance begins right in sync
     stepTimeoutRef.current = window.setTimeout(() => {
       scheduleNextWordStep(0);
-    }, 120);
+    }, 115);
 
     window.speechSynthesis.speak(utterance);
   }, [clearWordTimer, scheduleNextWordStep, selectedVoiceInfo, speechMap, voice]);
@@ -245,19 +256,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         window.speechSynthesis.resume();
       }
       setIsPaused(false);
-      const resumeIdx = Math.max(0, currentWordRef.current);
-      scheduleNextWordStep(resumeIdx);
+      scheduleNextWordStep(Math.max(0, currentWordRef.current));
     }
   };
-
-  const handleGenderSelect = (gender: VoiceGender) => {
-    onVoiceQuickChange({ voiceGender: gender });
-    if (isPlaying) {
-      stopSpeechCompletely();
-    }
-  };
-
-  const wpmDisplay = Math.round(60000 / Math.max(180, voice.highlightDelayMs || 460));
 
   return (
     <section
@@ -266,7 +267,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
     >
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="ss-responsive-grid grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-10">
-          {/* Left Column: Agency Headline, Value Props & Direct CTAs */}
+          {/* Left Column: Agency Headline, Value Props, CTAs & Real-Time Firestore Metrics */}
           <div className="ss-hero-col space-y-6 lg:col-span-6">
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -292,8 +293,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <motion.h1
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.06 }}
-              className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl xl:text-[3.35rem] xl:leading-[1.1]"
+              transition={{ duration: 0.52, delay: 0.05 }}
+              className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl xl:text-[3.3rem] xl:leading-[1.1]"
             >
               <span>{hero.headlinePrefix} </span>
               <span
@@ -310,7 +311,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <motion.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.12 }}
+              transition={{ duration: 0.52, delay: 0.1 }}
               className="max-w-xl text-base leading-relaxed text-slate-200 sm:text-lg"
             >
               {hero.subheadline}
@@ -320,7 +321,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.18 }}
+              transition={{ duration: 0.52, delay: 0.15 }}
               className="flex flex-wrap items-center gap-3.5 pt-1"
             >
               <button
@@ -344,27 +345,26 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </button>
             </motion.div>
 
-            {/* Pure Sheesha Glass Metric Cards */}
+            {/* Real-Time Dynamic Metrics Synced Live with Firebase Firestore */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.24 }}
+              transition={{ duration: 0.52, delay: 0.2 }}
               className="grid grid-cols-3 gap-3 pt-2"
             >
-              {[
-                { value: hero.stat1Value, label: hero.stat1Label },
-                { value: hero.stat2Value, label: hero.stat2Label },
-                { value: hero.stat3Value, label: hero.stat3Label },
-              ].map((stat, idx) => (
+              {computedMetrics.map((stat) => (
                 <div
-                  key={idx}
+                  key={stat.id}
                   className="ss-glass-card ss-glass-interactive rounded-2xl p-3.5 sm:p-4"
                 >
-                  <div
-                    className="font-display text-lg font-extrabold sm:text-2xl"
-                    style={{ color: theme.primaryColor }}
-                  >
-                    {stat.value}
+                  <div className="flex items-center justify-between gap-1">
+                    <div
+                      className="font-display text-lg font-extrabold sm:text-2xl"
+                      style={{ color: theme.primaryColor }}
+                    >
+                      {stat.displayValue}
+                    </div>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/90" title="Live synced metric" />
                   </div>
                   <div className="mt-0.5 text-[11px] font-medium text-slate-300 sm:text-xs">
                     {stat.label}
@@ -374,46 +374,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </motion.div>
           </div>
 
-          {/* Right Column: Pure Transparent Sheesha Interactive Voice & Floating Text Studio (ZERO CHARACTERS) */}
+          {/* Right Column: Clean Minimalist Public Voice Intro Card (ZERO Public Sliders/Controls) */}
           <div className="ss-hero-col lg:col-span-6">
             <motion.div
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="ss-glass-card relative rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6"
+              transition={{ duration: 0.55, delay: 0.08 }}
+              className="ss-glass-card relative rounded-3xl p-6 sm:p-9 shadow-2xl space-y-6"
             >
-              {/* Studio Status Top Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/15 pb-4">
+              {/* Minimalist Studio Header */}
+              <div className="flex items-center justify-between gap-2 border-b border-white/15 pb-4">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-cyan-400" />
                   <span className="font-mono text-xs font-bold uppercase tracking-wider text-cyan-300">
-                    SwiftStack Dynamic Voice Studio
+                    SwiftStack Interactive Intro
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono text-slate-300">
-                  <Volume2
-                    className={`h-3.5 w-3.5 ${
-                      isPlaying && !isPaused ? 'text-cyan-400 animate-pulse' : 'text-slate-400'
-                    }`}
-                  />
-                  <span>
-                    {isPlaying
-                      ? isPaused
-                        ? 'PAUSED'
-                        : 'SPEAKING LIVE'
-                      : `${wpmDisplay} WPM (${voice.highlightDelayMs}ms)`}
-                  </span>
-                </div>
+                <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                  {isPlaying ? (isPaused ? 'Paused' : 'Playing Audio') : 'Audio Briefing'}
+                </span>
               </div>
 
-              {/* Centered Glowing Circular Play Button + Ambient Acoustic Pulse Rings */}
-              <div className="relative flex flex-col items-center justify-center py-3">
+              {/* Centered Glowing Circular Play / Pause Button */}
+              <div className="relative flex flex-col items-center justify-center py-4">
                 <div className="relative flex items-center justify-center">
-                  {/* Outer Glowing Pulse Aura when Playing */}
                   {isPlaying && !isPaused && (
                     <>
                       <motion.span
-                        animate={{ scale: [1, 1.55, 1.85], opacity: [0.55, 0.2, 0] }}
+                        animate={{ scale: [1, 1.5, 1.82], opacity: [0.55, 0.2, 0] }}
                         transition={{ duration: 2.1, repeat: Infinity, ease: 'easeOut' }}
                         className="pointer-events-none absolute h-20 w-20 rounded-full"
                         style={{
@@ -422,10 +410,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                         }}
                       />
                       <motion.span
-                        animate={{ scale: [1, 1.35, 1.6], opacity: [0.45, 0.15, 0] }}
+                        animate={{ scale: [1, 1.32, 1.56], opacity: [0.42, 0.14, 0] }}
                         transition={{
                           duration: 2.1,
-                          delay: 0.7,
+                          delay: 0.65,
                           repeat: Infinity,
                           ease: 'easeOut',
                         }}
@@ -437,7 +425,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     </>
                   )}
 
-                  {/* Centered Glowing Circular Play / Pause Button */}
                   <motion.button
                     type="button"
                     whileHover={{ scale: 1.07 }}
@@ -468,7 +455,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     <button
                       type="button"
                       onClick={stopSpeechCompletely}
-                      title="Reset Intro Playback"
+                      title="Reset Audio Intro"
+                      aria-label="Reset Audio Intro"
                       className="ss-glass-btn absolute -right-14 flex h-10 w-10 items-center justify-center rounded-full text-slate-200"
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -476,8 +464,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   )}
                 </div>
 
-                {/* Live Acoustic Equalizer Pill */}
-                <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-cyan-300">
+                {/* Subtle Live Equalizer Wave */}
+                <div className="mt-3.5 flex items-center justify-center h-5">
                   {isPlaying && !isPaused ? (
                     <div className="flex items-end gap-1 h-4">
                       {[0.45, 0.95, 0.65, 1, 0.55, 0.85, 0.4].map((h, i) => (
@@ -495,18 +483,16 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       ))}
                     </div>
                   ) : (
-                    <span>Tap to Listen — Calibrated Real-Time Word Sync</span>
+                    <span className="text-xs font-semibold text-cyan-300">
+                      Tap Play to Hear Our Studio Introduction
+                    </span>
                   )}
                 </div>
               </div>
 
-              {/* Floating Kinetic Intro Script Box with Real-Time Cyan/Blue Word Highlighting */}
+              {/* Floating Kinetic Intro Script with Real-Time Cyan/Blue Word-by-Word Glowing Highlights */}
               <motion.div
-                animate={
-                  isPlaying && !isPaused
-                    ? { y: [0, -5, 0] }
-                    : { y: 0 }
-                }
+                animate={isPlaying && !isPaused ? { y: [0, -4, 0] } : { y: 0 }}
                 transition={{
                   duration: 3.4,
                   repeat: isPlaying && !isPaused ? Infinity : 0,
@@ -520,122 +506,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                     const isSpoken = activeWordIndex > idx;
                     return (
                       <React.Fragment key={`${word}-${idx}`}>
-                        <motion.span
-                          animate={
+                        <span
+                          className={`inline-block px-1.5 py-0.5 transition-all duration-150 ${
                             isActive
-                              ? { y: -2.5, scale: 1.07 }
-                              : { y: 0, scale: 1 }
-                          }
-                          transition={{ duration: 0.18, ease: 'easeOut' }}
-                          className={`inline-block px-1.5 py-0.5 transition-colors duration-200 ${
-                            isActive
-                              ? 'ss-word-highlight font-bold text-cyan-200'
+                              ? 'ss-word-highlight -translate-y-0.5 scale-105 font-bold text-cyan-200'
                               : isSpoken
                                 ? 'text-white'
                                 : 'text-slate-200'
                           }`}
                         >
                           {word}
-                        </motion.span>{' '}
+                        </span>{' '}
                       </React.Fragment>
                     );
                   })}
                 </p>
               </motion.div>
-
-              {/* Pakistani English Accent & Voice Customization Controls */}
-              <div className="ss-glass-card rounded-2xl p-4 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                    <Sliders className="h-3.5 w-3.5 text-cyan-400" />
-                    <span>Voice Engine Controls</span>
-                  </div>
-
-                  {/* Male / Female Voice Selector */}
-                  <div className="inline-flex rounded-xl border border-white/20 bg-white/5 p-0.5">
-                    {(['male', 'female'] as VoiceGender[]).map((g) => {
-                      const selected = voice.voiceGender === g;
-                      return (
-                        <button
-                          key={g}
-                          type="button"
-                          onClick={() => handleGenderSelect(g)}
-                          className={`rounded-lg px-3 py-1 text-xs font-bold capitalize transition ${
-                            selected
-                              ? 'keep-white-text text-white shadow'
-                              : 'text-slate-300 hover:text-white'
-                          }`}
-                          style={
-                            selected
-                              ? {
-                                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
-                                }
-                              : undefined
-                          }
-                        >
-                          {g} Voice
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Pitch & Speech Frequency Sliders */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1">
-                      <span>Pitch</span>
-                      <span className="font-bold text-cyan-300">
-                        {voice.voicePitch.toFixed(2)}x
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.65"
-                      max="1.45"
-                      step="0.05"
-                      value={voice.voicePitch}
-                      onChange={(e) =>
-                        onVoiceQuickChange({ voicePitch: parseFloat(e.target.value) })
-                      }
-                      aria-label="Voice Pitch"
-                      className="h-1.5 w-full cursor-pointer accent-cyan-400"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300 mb-1">
-                      <span>Frequency / Rate</span>
-                      <span className="font-bold text-cyan-300">
-                        {voice.speechFrequency.toFixed(2)}x
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.70"
-                      max="1.30"
-                      step="0.05"
-                      value={voice.speechFrequency}
-                      onChange={(e) =>
-                        onVoiceQuickChange({ speechFrequency: parseFloat(e.target.value) })
-                      }
-                      aria-label="Speech Frequency"
-                      className="h-1.5 w-full cursor-pointer accent-cyan-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-300 border-t border-white/10">
-                  <span className="inline-flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                    Pakistani English Phonetics (&ldquo;Randhawa&rdquo; soft &lsquo;dh&rsquo;)
-                  </span>
-                  <span className="inline-flex items-center gap-1 font-mono text-cyan-300 truncate max-w-[230px]">
-                    <Gauge className="h-3 w-3 shrink-0" />
-                    {activeVoiceLabel}
-                  </span>
-                </div>
-              </div>
             </motion.div>
           </div>
         </div>

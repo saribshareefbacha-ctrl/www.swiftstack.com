@@ -1,7 +1,12 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from '../src/data/defaultSeed';
+import {
+  DEFAULT_CMS_DATA,
+  DEFAULT_OFFICIAL_SOCIAL_LINKS,
+  DEFAULT_REALTIME_METRICS,
+  INITIAL_SAMPLE_INQUIRIES,
+} from '../src/data/defaultSeed';
 import { InquiryItem, SiteCMSData } from '../src/types/cms';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -9,7 +14,7 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const STORE_FILE = path.join(DATA_DIR, 'swiftstack_v5_store.json');
+const STORE_FILE = path.join(DATA_DIR, 'swiftstack_v6_store.json');
 
 export const AUTHORIZED_OWNER_EMAILS = [
   'saribshareefbacha@gmail.com',
@@ -105,12 +110,22 @@ export function readStore(): PersistentStoreSchema {
   if (memoryStore) return memoryStore;
   try {
     if (fs.existsSync(STORE_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8')) as Partial<PersistentStoreSchema>;
+      const parsed = JSON.parse(
+        fs.readFileSync(STORE_FILE, 'utf-8')
+      ) as Partial<PersistentStoreSchema>;
       const base = createDefaultStore();
       memoryStore = {
         cms: {
           branding: { ...base.cms.branding, ...(parsed.cms?.branding || {}) },
           hero: { ...base.cms.hero, ...(parsed.cms?.hero || {}) },
+          metrics:
+            Array.isArray(parsed.cms?.metrics) && parsed.cms.metrics.length > 0
+              ? parsed.cms.metrics
+              : structuredClone(DEFAULT_REALTIME_METRICS),
+          socialLinks:
+            Array.isArray(parsed.cms?.socialLinks) && parsed.cms.socialLinks.length > 0
+              ? parsed.cms.socialLinks
+              : structuredClone(DEFAULT_OFFICIAL_SOCIAL_LINKS),
           voice: { ...base.cms.voice, ...(parsed.cms?.voice || {}) },
           theme: { ...base.cms.theme, ...(parsed.cms?.theme || {}) },
           services: parsed.cms?.services || base.cms.services,

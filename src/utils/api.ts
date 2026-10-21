@@ -24,15 +24,22 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { firebaseAuth, firestoreDb, googleAuthProvider } from '../lib/firebase';
-import { DEFAULT_CMS_DATA, INITIAL_SAMPLE_INQUIRIES } from '../data/defaultSeed';
+import {
+  DEFAULT_CMS_DATA,
+  DEFAULT_OFFICIAL_SOCIAL_LINKS,
+  DEFAULT_REALTIME_METRICS,
+  INITIAL_SAMPLE_INQUIRIES,
+} from '../data/defaultSeed';
 import {
   CartItem,
   HeroCMS,
   InquiryItem,
   ProjectItem,
+  RealTimeMetricItem,
   ServiceItem,
   SiteBrandingMeta,
   SiteCMSData,
+  SocialLinkItem,
   SubAdminAccount,
   SubAdminPermissions,
   ThemeCMS,
@@ -44,14 +51,14 @@ import {
 const PERSISTED_SESSION_KEY = 'swiftstack_session_user_v5';
 const SESSION_ONLY_KEY = 'swiftstack_session_temp_v5';
 const RECENT_GOOGLE_ACCOUNTS_KEY = 'swiftstack_google_accounts_v5';
-const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v5';
+const LOCAL_CMS_KEY = 'swiftstack_cms_cache_v6';
 const LOCAL_INQUIRIES_KEY = 'swiftstack_orders_cache_v5';
 const LOCAL_CLIENTS_KEY = 'swiftstack_clients_cache_v5';
 const LOCAL_CART_KEY = 'swiftstack_shopping_cart_v5';
 export const THEME_STORAGE_KEY = 'swiftstack_theme_mode_v5';
 
 /**
- * Automatic Master Owner Recognition via Gmail & Official Studio Emails
+ * Automatic Master Owner Recognition via Gmail & Official Studio Emails.
  * Matching ANY of these automatically grants Master Owner privileges & unlocks the Owner Dashboard.
  */
 export const OWNER_GOOGLE_EMAILS = [
@@ -60,7 +67,7 @@ export const OWNER_GOOGLE_EMAILS = [
   'sarib@swiftstack.com',
 ];
 
-const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site_v5');
+const CMS_DOC_REF = doc(firestoreDb, 'swiftstack_cms', 'live_site_v6');
 const ORDERS_COL = collection(firestoreDb, 'swiftstack_orders');
 const USERS_COL = collection(firestoreDb, 'swiftstack_users');
 
@@ -237,9 +244,32 @@ function saveUserSession(profile: UserProfile | null, rememberMe = true) {
 export function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
   const base = structuredClone(DEFAULT_CMS_DATA);
   if (!raw) return base;
+
+  // Ensure all 7 official social platforms always exist cleanly alongside any custom links
+  let mergedSocials: SocialLinkItem[] = structuredClone(DEFAULT_OFFICIAL_SOCIAL_LINKS);
+  if (Array.isArray(raw.socialLinks) && raw.socialLinks.length > 0) {
+    const incomingMap = new Map(raw.socialLinks.map((s) => [s.id, s]));
+    mergedSocials = mergedSocials.map((official) => {
+      const match = incomingMap.get(official.id);
+      if (match) {
+        incomingMap.delete(official.id);
+        return { ...official, ...match, isOfficial: true };
+      }
+      return official;
+    });
+    incomingMap.forEach((customLink) => {
+      mergedSocials.push(customLink);
+    });
+  }
+
   return {
     branding: { ...base.branding, ...(raw.branding || {}) },
     hero: { ...base.hero, ...(raw.hero || {}) },
+    metrics:
+      Array.isArray(raw.metrics) && raw.metrics.length > 0
+        ? raw.metrics
+        : structuredClone(DEFAULT_REALTIME_METRICS),
+    socialLinks: mergedSocials,
     voice: {
       ...base.voice,
       ...(raw.voice || {}),
@@ -270,7 +300,22 @@ export function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
         : base.services,
     projects:
       Array.isArray(raw.projects) && raw.projects.length > 0 ? raw.projects : base.projects,
-    subAdmins: Array.isArray(raw.subAdmins) ? raw.subAdmins : base.subAdmins,
+    subAdmins: Array.isArray(raw.subAdmins)
+      ? raw.subAdmins.map((sa) => ({
+          ...sa,
+          permissions: Object.assign(
+            {
+              canEditHero: true,
+              canManageServices: true,
+              canManageProjects: true,
+              canManageTheme: false,
+              canManageOrders: true,
+              canManageSocial: true,
+            },
+            sa.permissions || {}
+          ),
+        }))
+      : base.subAdmins,
   };
 }
 
@@ -480,6 +525,10 @@ export const api = {
   ): (() => void) => {
     const saved = getStoredUserSession();
     if (saved) {
+      // Ensure stored Gmail owner always retains owner role
+      if (OWNER_GOOGLE_EMAILS.includes(saved.email.toLowerCase())) {
+        saved.role = 'owner';
+      }
       onUser(saved, false);
     }
 
@@ -530,6 +579,22 @@ export const api = {
     return { hero };
   },
 
+  updateMetrics: async (
+    metrics: RealTimeMetricItem[]
+  ): Promise<{ metrics: RealTimeMetricItem[] }> => {
+    const next = { ...getCachedCMS(), metrics };
+    await persistFullCMSToCloud(next);
+    return { metrics };
+  },
+
+  updateSocialLinks: async (
+    socialLinks: SocialLinkItem[]
+  ): Promise<{ socialLinks: SocialLinkItem[] }> => {
+    const next = { ...getCachedCMS(), socialLinks };
+    await persistFullCMSToCloud(next);
+    return { socialLinks };
+  },
+
   updateVoice: async (voice: VoiceEngineConfig): Promise<{ voice: VoiceEngineConfig }> => {
     const next = { ...getCachedCMS(), voice };
     await persistFullCMSToCloud(next);
@@ -548,7 +613,6 @@ export const api = {
     return fresh;
   },
 
-  // Sub-Admin Authorization & Management
   createSubAdmin: async (payload: {
     displayName: string;
     username: string;
@@ -596,7 +660,6 @@ export const api = {
     return { deleted: id };
   },
 
-  // Services CRUD
   createService: async (service: Partial<ServiceItem>): Promise<{ service: ServiceItem }> => {
     const cms = getCachedCMS();
     const parsedPrice =
@@ -651,7 +714,6 @@ export const api = {
     return { deleted: id };
   },
 
-  // Projects CRUD
   createProject: async (project: Partial<ProjectItem>): Promise<{ project: ProjectItem }> => {
     const cms = getCachedCMS();
     const created: ProjectItem = {
@@ -698,7 +760,6 @@ export const api = {
     return { deleted: id };
   },
 
-  // Unified Sign-In: Master Owner ('admin'/'admin'), Sub-Admins, & Firebase Auth + Remember Me
   login: async (
     identifier: string,
     password: string,
@@ -793,8 +854,7 @@ export const api = {
   }> => {
     googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const popupPromise = signInWithPopup(firebaseAuth, googleAuthProvider);
-      const result = await popupPromise;
+      const result = await signInWithPopup(firebaseAuth, googleAuthProvider);
       const profile = mapFirebaseUserWithRoles(result.user);
       saveUserSession(profile, rememberMe);
       rememberGoogleAccountChoice(profile);
