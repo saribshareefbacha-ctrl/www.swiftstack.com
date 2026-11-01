@@ -1,37 +1,79 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle2, Globe2, Mail, Send, ShieldCheck, Sparkles } from 'lucide-react';
-import { HeroCMS, ServiceItem, ThemeCMS, UserProfile } from '../types/cms';
+import {
+  CheckCircle2,
+  Clock,
+  Globe2,
+  Mail,
+  Send,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+} from 'lucide-react';
+import { CartItem, ServiceItem, SiteBrandingMeta, ThemeCMS, UserProfile } from '../types/cms';
 import { api } from '../utils/api';
+import { GlassSpinner, pushToast } from './GlassUI';
 
 interface ContactQuoteSectionProps {
-  hero: HeroCMS;
-  theme: ThemeCMS;
   services: ServiceItem[];
-  preselectedService: string;
+  branding: SiteBrandingMeta;
+  theme: ThemeCMS;
   currentUser: UserProfile | null;
+  cart: CartItem[];
+  preselectedService: string;
   onInquiryCreated: () => void;
+  onClearCart: () => void;
+  onOpenAuth: (tab?: 'login' | 'register') => void;
+  onOpenClientPortal: () => void;
+  onOpenCart: () => void;
 }
 
+const BUDGET_RANGES = [
+  '$300 – $1,000 (Starter Package)',
+  '$1,000 – $2,500 (Growth Build)',
+  '$2,500 – $5,000 (Full Platform / 3D)',
+  '$5,000 – $10,000+ (Enterprise Custom)',
+];
+
+const TIMELINES = [
+  'Urgent (Within 1 Week)',
+  '2 – 4 Weeks',
+  '1 – 2 Months',
+  'Ongoing Retainer Partnership',
+];
+
 export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
-  hero,
-  theme,
   services,
-  preselectedService,
+  branding,
+  theme,
   currentUser,
+  cart,
+  preselectedService,
   onInquiryCreated,
+  onClearCart,
+  onOpenAuth,
+  onOpenClientPortal,
+  onOpenCart,
 }) => {
   const [clientName, setClientName] = useState(currentUser?.displayName || '');
   const [clientEmail, setClientEmail] = useState(currentUser?.email || '');
   const [companyName, setCompanyName] = useState(currentUser?.company || '');
   const [serviceTitle, setServiceTitle] = useState(
-    preselectedService || services[0]?.title || '3D Web Design & Modern Front-End'
+    preselectedService || services[0]?.title || 'Full-Stack Web & Cloud Applications'
   );
-  const [budgetRange, setBudgetRange] = useState('$2,500 – $5,000');
-  const [timeline, setTimeline] = useState('2 – 4 Weeks');
+  const [budgetRange, setBudgetRange] = useState(BUDGET_RANGES[1]);
+  const [timeline, setTimeline] = useState(TIMELINES[1]);
   const [projectDetails, setProjectDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [submittedSuccess, setSubmittedSuccess] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      setClientName(currentUser.displayName);
+      setClientEmail(currentUser.email);
+      if (currentUser.company) setCompanyName(currentUser.company);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (preselectedService) {
@@ -39,13 +81,7 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
     }
   }, [preselectedService]);
 
-  useEffect(() => {
-    if (currentUser) {
-      setClientName((prev) => prev || currentUser.displayName);
-      setClientEmail((prev) => prev || currentUser.email);
-      setCompanyName((prev) => prev || currentUser.company);
-    }
-  }, [currentUser]);
+  const cartTotalUsd = cart.reduce((acc, item) => acc + item.basePriceUsd * item.quantity, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,298 +89,338 @@ export const ContactQuoteSection: React.FC<ContactQuoteSectionProps> = ({
     setSubmitting(true);
     try {
       await api.submitInquiry({
+        clientId: currentUser?.id || null,
         clientName,
         clientEmail,
         companyName,
         serviceTitle,
-        budgetRange,
+        budgetRange:
+          cart.length > 0
+            ? `Cart Bundle ($${cartTotalUsd.toLocaleString()}) · ${budgetRange}`
+            : budgetRange,
         timeline,
         projectDetails,
+        cartSummary: cart,
       });
       setSubmittedSuccess(true);
       setProjectDetails('');
+      if (cart.length > 0) {
+        onClearCart();
+      }
+      pushToast(
+        'Order & Quote Dispatched!',
+        'Muhammad Sarib Randhawa & the SwiftStack team received your brief.',
+        'success'
+      );
       onInquiryCreated();
-      setTimeout(() => setSubmittedSuccess(false), 6000);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unable to send request.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to send request right now.');
+      pushToast('Submission Error', 'Unable to send your brief right now.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <>
-      <section id="contact" className="relative py-24 sm:py-28">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            {/* Left Direct Agency Overview */}
-            <div className="lg:col-span-5 space-y-6">
-              <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-cyan-300">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span>Initiate Collaboration</span>
-              </div>
-
-              <h2 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-white tracking-tight">
-                Ready to Build Something{' '}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{
-                    backgroundImage: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
-                  }}
-                >
-                  Unforgettable?
-                </span>
-              </h2>
-
-              <p className="text-slate-300/90 text-base leading-relaxed">
-                Share your product roadmap, 3D experience concept, mobile APK build, or AI brand
-                vision. Muhammad Sarib Randhawa personally reviews every blueprint and responds with
-                a tailored architecture &amp; milestone quote.
-              </p>
-
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
-                  <Mail className="w-5 h-5 text-cyan-400 shrink-0" />
-                  <div>
-                    <div className="text-xs font-mono text-slate-400">Direct Studio Desk</div>
-                    <div className="text-sm font-semibold text-white">{hero.contactEmail}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
-                  <Globe2 className="w-5 h-5 text-cyan-400 shrink-0" />
-                  <div>
-                    <div className="text-xs font-mono text-slate-400">
-                      Global Delivery &amp; Channels
-                    </div>
-                    <div className="text-sm font-semibold text-white">
-                      {hero.locationLabel} · {hero.socialHandle}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-900/65 border border-white/10 backdrop-blur-md">
-                  <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0" />
-                  <div>
-                    <div className="text-xs font-mono text-slate-400">Client Portal Sync</div>
-                    <div className="text-sm text-slate-300">
-                      Sign in anytime with your email or Google account to track live quote updates.
-                    </div>
-                  </div>
-                </div>
-              </div>
+    <section id="order" className="relative py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="ss-responsive-grid grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+          {/* Left Column: Why SwiftStack & Direct Studio Info */}
+          <div className="ss-hero-col lg:col-span-5 space-y-6">
+            <div className="ss-glass-card inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-mono uppercase tracking-wider text-cyan-300">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Start Your Project Today</span>
             </div>
 
-            {/* Right Interactive Quote Form */}
-            <form
-              onSubmit={handleSubmit}
-              style={{
-                backgroundColor: `rgba(15, 23, 42, ${theme.glassOpacity})`,
-              }}
-              className="lg:col-span-7 rounded-3xl border border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl space-y-5"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="font-display font-bold text-xl text-white">
-                    Request a Custom Project Quote
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Zero obligation · Full technical scope &amp; milestone estimate
-                  </p>
-                </div>
-                <span className="px-3 py-1 rounded-full text-[11px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
-                  SwiftStack (SS)
-                </span>
-              </div>
-
-              {errorMsg && (
-                <div className="p-3.5 rounded-xl bg-red-500/15 border border-red-400/40 text-xs text-red-200">
-                  {errorMsg}
-                </div>
-              )}
-
-              {submittedSuccess && (
-                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 flex items-center gap-3 text-sm text-emerald-200">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span>
-                    Project brief received! Muhammad Sarib Randhawa&apos;s desk has logged your
-                    inquiry — track real-time updates anytime in your account portal.
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Your Full Name *
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="Alex Rivera"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Work or Personal Email *
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    placeholder="alex@company.com"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Company / Brand / Channel
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Optional brand name"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Selected SwiftStack Service
-                  </label>
-                  <select
-                    value={serviceTitle}
-                    onChange={(e) => setServiceTitle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  >
-                    {services.map((srv) => (
-                      <option key={srv.id} value={srv.title}>
-                        {srv.title}
-                      </option>
-                    ))}
-                    <option value="Custom Multi-Service Architecture">
-                      Custom Multi-Service Architecture
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Estimated Investment Range
-                  </label>
-                  <select
-                    value={budgetRange}
-                    onChange={(e) => setBudgetRange(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="$500 – $1,500">$500 – $1,500</option>
-                    <option value="$1,500 – $2,500">$1,500 – $2,500</option>
-                    <option value="$2,500 – $5,000">$2,500 – $5,000</option>
-                    <option value="$5,000 – $12,000">$5,000 – $12,000</option>
-                    <option value="$12,000+ Enterprise">$12,000+ Enterprise</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                    Target Delivery Window
-                  </label>
-                  <select
-                    value={timeline}
-                    onChange={(e) => setTimeline(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="ASAP / Rush Sprint">ASAP / Rush Sprint</option>
-                    <option value="1 – 2 Weeks">1 – 2 Weeks</option>
-                    <option value="2 – 4 Weeks">2 – 4 Weeks</option>
-                    <option value="1 – 2 Months">1 – 2 Months</option>
-                    <option value="Ongoing Retainer">Ongoing Monthly Retainer</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                  Project Scope, Goals &amp; Inspiration *
-                </label>
-                <textarea
-                  required
-                  rows={4}
-                  placeholder="Tell us about your platform goals, key features, 3D visual ideas, or target audience..."
-                  value={projectDetails}
-                  onChange={(e) => setProjectDetails(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400 resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3.5 px-6 rounded-2xl font-display font-bold text-sm sm:text-base text-slate-950 flex items-center justify-center gap-2 shadow-[0_0_28px_rgba(6,182,212,0.35)] hover:opacity-95 transition-all disabled:opacity-60"
+            <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+              Ready to Build Something Extraordinary with{' '}
+              <span
+                className="bg-clip-text text-transparent"
                 style={{
-                  background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
+                  backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
                 }}
               >
-                <Send className="w-4 h-4" />
-                <span>
-                  {submitting ? 'Transmitting Project Brief...' : 'Submit Project Brief to SwiftStack'}
-                </span>
-              </button>
-            </form>
+                SwiftStack?
+              </span>
+            </h2>
+
+            <p className="text-base text-slate-300 leading-relaxed">
+              Submit your project brief or check out directly from your shopping cart. Every inquiry
+              is synced in real time to Firebase and reviewed personally by founder{' '}
+              <strong className="text-white">{branding.founderName}</strong>.
+            </p>
+
+            {cart.length > 0 && (
+              <div className="ss-glass-card rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-mono uppercase text-cyan-400">
+                    Active Shopping Cart Attached
+                  </div>
+                  <div className="text-sm font-bold text-white mt-0.5">
+                    {cart.reduce((s, i) => s + i.quantity, 0)} Service(s) · Est. $
+                    {cartTotalUsd.toLocaleString()}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenCart}
+                  className="ss-glass-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Review Cart</span>
+                </button>
+              </div>
+            )}
+
+            <div className="space-y-3.5 pt-1">
+              <div className="ss-glass-card ss-glass-interactive flex items-start gap-3.5 rounded-2xl p-4">
+                <Clock className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Fast 24-Hour Proposal Turnaround</h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Clear technical architecture, milestone roadmap, and transparent pricing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="ss-glass-card ss-glass-interactive flex items-start gap-3.5 rounded-2xl p-4">
+                <ShieldCheck className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Real-Time Client Portal Tracking</h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {currentUser ? (
+                      <>
+                        Signed in as <strong className="text-white">{currentUser.email}</strong>.
+                        View live status updates anytime in your Client Portal.
+                      </>
+                    ) : (
+                      <>
+                        Sign in with Google or create an account to manage orders in one click.{' '}
+                        <button
+                          type="button"
+                          onClick={() => onOpenAuth('register')}
+                          className="text-cyan-400 underline font-semibold"
+                        >
+                          Sign in / Register
+                        </button>
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="ss-glass-card ss-glass-interactive flex items-start gap-3.5 rounded-2xl p-4">
+                <Globe2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Direct Founder Contact</h3>
+                  <p className="text-xs text-slate-300 mt-0.5 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{branding.contactEmail}</span>
+                    <span>·</span>
+                    <span>{branding.locationText}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Interactive Pure-Sheesha Order & Quote Form */}
+          <div className="ss-hero-col lg:col-span-7">
+            <div className="ss-glass-card rounded-3xl p-6 sm:p-9 shadow-2xl">
+              {submittedSuccess ? (
+                <div className="py-10 text-center space-y-5">
+                  <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="w-9 h-9" />
+                  </div>
+                  <h3 className="font-display text-2xl font-bold text-white">
+                    Order Request Received by SwiftStack!
+                  </h3>
+                  <p className="max-w-md mx-auto text-sm text-slate-300 leading-relaxed">
+                    Thank you, <strong className="text-white">{clientName}</strong>. Your inquiry
+                    for <strong className="text-cyan-400">{serviceTitle}</strong> is live in our
+                    cloud portal and will receive an official quote shortly.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    {currentUser && currentUser.role === 'client' && (
+                      <button
+                        type="button"
+                        onClick={onOpenClientPortal}
+                        className="keep-white-text ss-cta-btn px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+                        style={{
+                          backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                        }}
+                      >
+                        View Status in Client Portal
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSubmittedSuccess(false)}
+                      className="ss-glass-btn px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+                    >
+                      Submit Another Request
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="flex items-center justify-between border-b border-white/15 pb-4">
+                    <h3 className="font-display text-xl font-bold text-white">
+                      Project Brief &amp; Custom Quote Request
+                    </h3>
+                    <span className="text-xs font-mono text-cyan-400">Free Consultation</span>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="rounded-xl bg-rose-500/15 border border-rose-500/35 px-4 py-3 text-xs text-rose-300">
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Your Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={clientName}
+                        onChange={(e) => setClientName(e.target.value)}
+                        placeholder="Alex Morgan"
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Work Email *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={clientEmail}
+                        onChange={(e) => setClientEmail(e.target.value)}
+                        placeholder="alex@company.com"
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Company / Brand Name
+                      </label>
+                      <input
+                        type="text"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        placeholder="Optional organization or brand"
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Service Needed *
+                      </label>
+                      <select
+                        value={serviceTitle}
+                        onChange={(e) => setServiceTitle(e.target.value)}
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      >
+                        {services.map((s) => (
+                          <option key={s.id} value={s.title}>
+                            {s.title} ({s.priceLabel})
+                          </option>
+                        ))}
+                        {!services.some((s) => s.title === serviceTitle) && (
+                          <option value={serviceTitle}>{serviceTitle}</option>
+                        )}
+                        <option value="Custom Multi-Service Package">
+                          Custom Multi-Service Package
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Estimated Budget
+                      </label>
+                      <select
+                        value={budgetRange}
+                        onChange={(e) => setBudgetRange(e.target.value)}
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      >
+                        {BUDGET_RANGES.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                        Target Timeline
+                      </label>
+                      <select
+                        value={timeline}
+                        onChange={(e) => setTimeline(e.target.value)}
+                        className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                      >
+                        {TIMELINES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-200 mb-1.5">
+                      Project Goals &amp; Requirements *
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={projectDetails}
+                      onChange={(e) => setProjectDetails(e.target.value)}
+                      placeholder="Tell SwiftStack what you want to launch, key features, design references, or business goals..."
+                      className="ss-glass-input w-full rounded-xl px-4 py-3 text-sm"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="keep-white-text ss-cta-btn w-full py-3.5 px-6 rounded-2xl text-sm font-bold text-white shadow-xl inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                    style={{
+                      backgroundImage: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
+                    }}
+                  >
+                    {submitting ? (
+                      <>
+                        <GlassSpinner size="sm" />
+                        <span>Submitting Request...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Project Brief &amp; Request Quote</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
-      </section>
-
-      {/* Clean Public Footer (Strictly zero visible Admin/CMS links) */}
-      <footer className="border-t border-white/10 bg-slate-950/80 backdrop-blur-xl py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-display font-bold text-xs text-white"
-              style={{
-                background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent}, ${theme.tertiaryAccent})`,
-              }}
-            >
-              {hero.companyAbbreviation}
-            </div>
-            <div>
-              <div className="font-display font-bold text-sm text-white">
-                {hero.companyName} ({hero.companyAbbreviation}) · Founded by {hero.founderName}
-              </div>
-              <div className="text-xs text-slate-400">
-                Full-Stack Engineering · 3D Spatial Web · AI Media Studio ({hero.socialHandle})
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-6 text-xs text-slate-400">
-            <a href="#hero" className="hover:text-white transition-colors">
-              Overview
-            </a>
-            <a href="#services" className="hover:text-white transition-colors">
-              Services
-            </a>
-            <a href="#avatar-studio" className="hover:text-white transition-colors">
-              3D Studio
-            </a>
-            <a href="#projects" className="hover:text-white transition-colors">
-              Projects
-            </a>
-            <span>© {new Date().getFullYear()} {hero.companyName}. All rights reserved.</span>
-          </div>
-        </div>
-      </footer>
-    </>
+      </div>
+    </section>
   );
 };

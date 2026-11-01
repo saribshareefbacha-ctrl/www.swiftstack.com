@@ -1,352 +1,580 @@
-import React, { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Lock, Mail, User, Building2, X } from 'lucide-react';
-import { HeroCMS, ThemeCMS, UserProfile } from '../types/cms';
-import { api, setStoredToken } from '../utils/api';
+import React, { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Crown,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  User,
+  X,
+} from 'lucide-react';
+import { UserProfile } from '../types/cms';
+import {
+  api,
+  getAvailableGoogleChooserAccounts,
+  QuickGoogleAccountOption,
+  syncFirebasePersistenceMode,
+} from '../utils/api';
+import { SwiftStackLogo } from './SwiftStackLogo';
+import { GlassSpinner, pushToast } from './GlassUI';
 
 interface AuthModalProps {
-  open: boolean;
-  hero: HeroCMS;
-  theme: ThemeCMS;
+  isOpen: boolean;
+  initialTab?: 'login' | 'register';
+  primaryColor: string;
+  secondaryColor: string;
+  companyName: string;
+  monogram: string;
+  profileIconUrl: string;
   onClose: () => void;
-  onAuthenticated: (user: UserProfile) => void;
+  onAuthenticated: (user: UserProfile, openDashboardIfStaff?: boolean) => void;
 }
 
+const GoogleGLogo: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="#EA4335"
+      d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-2 3l3.2 2.5c1.9-1.7 3-4.3 3-7.4 0-.7-.1-1.4-.2-2H12z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.5c-.9.6-2.1 1-3.5 1-2.7 0-5-1.8-5.8-4.3H2.9v2.6C4.6 19.8 8 22 12 22z"
+    />
+    <path
+      fill="#4A90E2"
+      d="M6.2 13.8c-.2-.6-.3-1.2-.3-1.8s.1-1.2.3-1.8V7.6H2.9C2.3 8.9 2 10.4 2 12s.3 3.1.9 4.4l3.3-2.6z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M12 5.9c1.5 0 2.8.5 3.9 1.5l2.9-2.9C17 2.9 14.7 2 12 2 8 2 4.6 4.2 2.9 7.6l3.3 2.6c.8-2.5 3.1-4.3 5.8-4.3z"
+    />
+  </svg>
+);
+
 export const AuthModal: React.FC<AuthModalProps> = ({
-  open,
-  hero,
-  theme,
+  isOpen,
+  initialTab = 'login',
+  primaryColor,
+  secondaryColor,
+  companyName,
+  monogram,
+  profileIconUrl,
   onClose,
   onAuthenticated,
 }) => {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'google-picker'>('signin');
+  const [tab, setTab] = useState<'login' | 'register'>(initialTab);
   const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [company, setCompany] = useState('');
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+  const [displayName, setDisplayName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [company, setCompany] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showInstantGoogleChooser, setShowInstantGoogleChooser] = useState(false);
+  const [googleAccounts, setGoogleAccounts] = useState<QuickGoogleAccountOption[]>([]);
+
+  useEffect(() => {
+    setTab(initialTab);
+    setError('');
+    setShowInstantGoogleChooser(false);
+  }, [initialTab, isOpen]);
+
+  if (!isOpen) return null;
+
+  const completeSignIn = (user: UserProfile) => {
+    if (user.role === 'owner') {
+      pushToast(
+        'Master Owner Verified',
+        `Welcome back ${user.displayName} (${user.email}). Unlocking Owner Admin Dashboard!`,
+        'success'
+      );
+      onAuthenticated(user, true);
+    } else if (user.role === 'subadmin') {
+      pushToast(
+        'Sub-Admin Portal Unlocked',
+        `Signed in as ${user.displayName}. Opening Sub-Admin Portal.`,
+        'success'
+      );
+      onAuthenticated(user, true);
+    } else {
+      pushToast(
+        'Signed In Successfully',
+        `Welcome to SwiftStack, ${user.displayName}!`,
+        'success'
+      );
+      onAuthenticated(user, false);
+    }
+    onClose();
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      if (mode === 'signin') {
-        const res = await api.login(identifier, password);
-        setStoredToken(res.token);
-        onAuthenticated(res.user);
-        setIdentifier('');
-        setPassword('');
-        onClose();
+      const res = await api.login(identifier.trim(), loginPassword, rememberMe);
+      completeSignIn(res.user);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        setError('Invalid credentials. Please check your username/email and password.');
       } else {
-        const res = await api.register({
-          displayName,
-          email: identifier,
-          password,
-          company,
-        });
-        setStoredToken(res.token);
-        onAuthenticated(res.user);
-        setIdentifier('');
-        setPassword('');
-        onClose();
+        setError(err instanceof Error ? err.message : 'Sign-in failed');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed.');
+      pushToast('Authentication Failed', 'Please verify your email/username and password.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async (email: string, name: string, org = '') => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await api.googleAuth({
-        email,
-        displayName: name,
-        company: org,
+      const res = await api.register({
+        displayName,
+        email: regEmail,
+        password: regPassword,
+        company,
+        rememberMe,
       });
-      setStoredToken(res.token);
-      onAuthenticated(res.user);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google Sign-In failed.');
+      completeSignIn(res.user);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists. Switch to Login instead.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Account creation failed');
+      }
+      pushToast('Sign Up Error', 'Unable to register account with those details.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleContinue = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      const res = await api.signInWithGoogle(rememberMe);
+      if (res.redirecting) {
+        return;
+      }
+      if (res.needsAccountChooser) {
+        setGoogleAccounts(getAvailableGoogleChooserAccounts());
+        setShowInstantGoogleChooser(true);
+        return;
+      }
+      if (res.user) {
+        completeSignIn(res.user);
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || '';
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setError(err instanceof Error ? err.message : 'Google Sign-In encountered an error.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleInstantGooglePick = async (account: QuickGoogleAccountOption) => {
+    setGoogleLoading(true);
+    try {
+      const res = await api.selectGoogleAccountInstant(account, rememberMe);
+      completeSignIn(res.user);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl"
+      role="dialog"
+      aria-modal="true"
+      aria-label="SwiftStack Authentication"
+    >
+      <div className="ss-modal-surface relative w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] overflow-y-auto">
+        <button
+          type="button"
           onClick={onClose}
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4"
+          aria-label="Close modal"
+          className="ss-glass-btn absolute top-4 right-4 p-2 rounded-xl text-slate-300 hover:text-white"
         >
-          <motion.div
-            initial={{ scale: 0.94, opacity: 0, y: 12 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.94, opacity: 0, y: 12 }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-3xl bg-slate-900/95 border border-white/15 p-6 sm:p-8 shadow-[0_25px_70px_rgba(2,6,23,0.95)]"
-          >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="p-6 sm:p-8 space-y-5">
+          <div className="flex flex-col items-center text-center space-y-2">
+            <SwiftStackLogo
+              primaryColor={primaryColor}
+              secondaryColor={secondaryColor}
+              companyName={companyName}
+              monogram={monogram}
+              profileIconUrl={profileIconUrl}
+              showSubtext={false}
+            />
+            <h2 className="font-display text-2xl font-extrabold text-white pt-1">
+              {tab === 'login' ? 'Sign In to SwiftStack' : 'Create Your Account'}
+            </h2>
+            <p className="text-xs text-slate-300 max-w-xs">
+              Continue instantly with Google or sign in with your account credentials.
+            </p>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2.5 rounded-2xl bg-rose-500/15 border border-rose-500/35 p-3.5 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Direct One-Click Google Sign-In */}
+          {!showInstantGoogleChooser ? (
             <button
               type="button"
-              onClick={onClose}
-              aria-label="Close Sign In Modal"
-              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              disabled={googleLoading || loading}
+              onClick={handleGoogleContinue}
+              className="keep-dark-text w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-900 text-sm font-bold shadow-md border border-slate-200 inline-flex items-center justify-center gap-2.5 transition disabled:opacity-60"
             >
-              <X className="w-4 h-4" />
+              {googleLoading ? (
+                <GlassSpinner size="sm" />
+              ) : (
+                <GoogleGLogo className="w-4 h-4 shrink-0" />
+              )}
+              <span>{googleLoading ? 'Opening Google Accounts...' : 'Continue with Google'}</span>
             </button>
-
-            {/* Brand Header */}
-            <div className="flex items-center gap-3 mb-6">
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center font-display font-bold text-sm text-white shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent}, ${theme.tertiaryAccent})`,
-                }}
-              >
-                {hero.companyAbbreviation}
+          ) : (
+            /* Zero-Input 1-Click Google Account Picker when running inside unlisted sandbox host */
+            <div className="ss-glass-card rounded-2xl p-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <GoogleGLogo className="w-4 h-4" />
+                  <span>Choose an account to continue to SwiftStack</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInstantGoogleChooser(false)}
+                  className="text-[11px] text-slate-400 hover:text-white"
+                >
+                  Back
+                </button>
               </div>
-              <div>
-                <h2 className="font-display font-bold text-xl text-white">
-                  {mode === 'signup' ? 'Create Account' : 'Sign In / Continue'}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Access your {hero.companyName} project portal &amp; saved preferences
-                </p>
+
+              <div className="space-y-2 pt-1">
+                {googleAccounts.map((acc) => {
+                  const isOwnerEmail =
+                    acc.email.toLowerCase() === 'saribshareefbacha@gmail.com' ||
+                    acc.email.toLowerCase() === 'swiftstackdigi01@gmail.com';
+                  return (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      disabled={googleLoading}
+                      onClick={() => handleInstantGooglePick(acc)}
+                      className="w-full flex items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/5 hover:border-cyan-400/60 p-3 text-left transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="keep-white-text w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold text-white shrink-0"
+                          style={{
+                            backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                          }}
+                        >
+                          {isOwnerEmail ? (
+                            <Crown className="w-4 h-4" />
+                          ) : (
+                            acc.displayName.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">
+                            {acc.displayName}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-300 truncate">
+                            {acc.email}
+                          </div>
+                          <div className="text-[10px] font-semibold text-cyan-300">
+                            {acc.badge}
+                          </div>
+                        </div>
+                      </div>
+                      <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          )}
 
-            {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/15 border border-red-400/40 text-xs text-red-200">
-                {error}
-              </div>
-            )}
+          {/* Divider */}
+          <div className="relative flex items-center py-0.5">
+            <div className="flex-grow border-t border-white/15" />
+            <span className="shrink mx-3 text-[11px] font-mono uppercase text-slate-400">
+              or with account
+            </span>
+            <div className="flex-grow border-t border-white/15" />
+          </div>
 
-            {mode === 'google-picker' ? (
-              <div className="space-y-4">
-                <div className="text-xs font-mono uppercase tracking-wider text-cyan-300">
-                  Google OAuth 2.0 · Choose an Account
-                </div>
+          {/* Login / Sign Up Switcher */}
+          <div className="grid grid-cols-2 rounded-2xl bg-white/5 p-1 border border-white/15">
+            <button
+              type="button"
+              onClick={() => {
+                setTab('login');
+                setError('');
+              }}
+              className={`py-2 rounded-xl text-xs font-bold transition ${
+                tab === 'login' ? 'keep-white-text text-white shadow' : 'text-slate-300'
+              }`}
+              style={
+                tab === 'login'
+                  ? {
+                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                    }
+                  : undefined
+              }
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('register');
+                setError('');
+              }}
+              className={`py-2 rounded-xl text-xs font-bold transition ${
+                tab === 'register' ? 'keep-white-text text-white shadow' : 'text-slate-300'
+              }`}
+              style={
+                tab === 'register'
+                  ? {
+                      backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                    }
+                  : undefined
+              }
+            >
+              Sign Up
+            </button>
+          </div>
 
-                {/* Instant Demo Google Account Option */}
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() =>
-                    handleGoogleLogin('zainab@lumina-tech.io', 'Zainab Malik', 'Lumina Tech Labs')
-                  }
-                  className="w-full p-3.5 rounded-2xl bg-slate-950/85 hover:bg-slate-800 border border-white/15 flex items-center gap-3 text-left transition-all"
-                >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-xs text-slate-950">
-                    ZM
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-white">Zainab Malik</div>
-                    <div className="text-xs text-slate-400 truncate">zainab@lumina-tech.io</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-cyan-400" />
-                </button>
-
-                {/* Or Enter Any Google Workspace / Gmail Address */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleGoogleLogin(
-                      googleEmail,
-                      googleName || googleEmail.split('@')[0] || 'Google Client'
-                    );
-                  }}
-                  className="p-4 rounded-2xl bg-slate-950/65 border border-white/10 space-y-3"
-                >
-                  <div className="text-xs font-medium text-slate-300">
-                    Or continue with your own Google email:
-                  </div>
+          {tab === 'login' ? (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                  Email or Username
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    required
                     type="text"
-                    placeholder="Your Name"
-                    value={googleName}
-                    onChange={(e) => setGoogleName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-cyan-400"
-                  />
-                  <input
                     required
-                    type="email"
-                    placeholder="you@gmail.com"
-                    value={googleEmail}
-                    onChange={(e) => setGoogleEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-xs text-white focus:outline-none focus:border-cyan-400"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="you@company.com or username"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-4 py-2.5 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-11 py-2.5 text-sm"
                   />
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2.5 rounded-xl bg-white text-slate-950 font-semibold text-xs hover:bg-slate-100 transition-colors"
+                    type="button"
+                    onClick={() => setShowLoginPassword((prev) => !prev)}
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-cyan-300 transition"
                   >
-                    {loading ? 'Authenticating...' : 'Continue with Google Account'}
+                    {showLoginPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
-                </form>
-
-                <button
-                  type="button"
-                  onClick={() => setMode('signin')}
-                  className="w-full text-center text-xs text-slate-400 hover:text-white pt-1"
-                >
-                  ← Back to standard Sign In
-                </button>
+                </div>
               </div>
-            ) : (
-              <>
-                {/* Integrated Continue with Google Button */}
-                <button
-                  type="button"
-                  onClick={() => setMode('google-picker')}
-                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 shadow-md transition-all"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#EA4335"
-                      d="M12 10.2v3.9h5.5c-.24 1.26-.96 2.33-2.04 3.05l3.3 2.56c1.92-1.77 3.04-4.38 3.04-7.47 0-.72-.06-1.41-.19-2.04H12z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M6.53 14.28l-.74.57-2.64 2.05C4.83 20.23 8.15 22.5 12 22.5c2.7 0 4.96-.89 6.62-2.42l-3.3-2.56c-.91.61-2.07.98-3.32.98-2.55 0-4.72-1.72-5.49-4.05z"
-                    />
-                    <path
-                      fill="#4A90E2"
-                      d="M3.15 7.6C2.42 9.04 2 10.67 2 12.4c0 1.73.42 3.36 1.15 4.8l3.38-2.62c-.2-.6-.33-1.24-.33-1.91s.13-1.31.33-1.91L3.15 7.6z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M12 6.28c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.95 3.28 14.7 2.3 12 2.3 8.15 2.3 4.83 4.57 3.15 7.9l3.38 2.62c.77-2.33 2.94-4.24 5.47-4.24z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
-                </button>
 
-                <div className="relative my-5 flex items-center">
-                  <div className="flex-grow border-t border-white/10" />
-                  <span className="mx-3 text-[11px] font-mono uppercase text-slate-500">
-                    or continue with credentials
-                  </span>
-                  <div className="flex-grow border-t border-white/10" />
-                </div>
-
-                <form onSubmit={handleCredentialsSubmit} className="space-y-4">
-                  {mode === 'signup' && (
-                    <>
-                      <div className="relative">
-                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          required
-                          type="text"
-                          placeholder="Full Name"
-                          value={displayName}
-                          onChange={(e) => setDisplayName(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                        />
-                      </div>
-                      <div className="relative">
-                        <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          placeholder="Company or Brand (Optional)"
-                          value={company}
-                          onChange={(e) => setCompany(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      required
-                      type={mode === 'signup' ? 'email' : 'text'}
-                      placeholder={mode === 'signup' ? 'Email Address' : 'Username or Email'}
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                    />
-                  </div>
-
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      required
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950/90 border border-white/15 text-sm text-white focus:outline-none focus:border-cyan-400"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3.5 rounded-2xl font-display font-bold text-sm text-slate-950 flex items-center justify-center gap-2 shadow-lg transition-all hover:opacity-95 disabled:opacity-60"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primaryAccent}, ${theme.secondaryAccent})`,
+              <div className="flex items-center justify-between pt-0.5">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setRememberMe(next);
+                      syncFirebasePersistenceMode(next);
                     }}
-                  >
-                    <span>
-                      {loading
-                        ? 'Signing In...'
-                        : mode === 'signup'
-                          ? 'Create SwiftStack Account'
-                          : 'Sign In'}
-                    </span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
+                    className="rounded border-slate-500 text-cyan-500 focus:ring-cyan-500"
+                  />
+                  <span>Remember Me</span>
+                </label>
+                <span className="text-[11px] text-slate-400 font-mono">Persistent Session</span>
+              </div>
 
-                <div className="mt-5 text-center text-xs text-slate-400">
-                  {mode === 'signin' ? (
-                    <>
-                      New to {hero.companyName}?{' '}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setError('');
-                          setMode('signup');
-                        }}
-                        className="text-cyan-300 font-semibold hover:underline"
-                      >
-                        Create a Client Account
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      Already have an account?{' '}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setError('');
-                          setMode('signin');
-                        }}
-                        className="text-cyan-300 font-semibold hover:underline"
-                      >
-                        Sign In
-                      </button>
-                    </>
-                  )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="keep-white-text ss-cta-btn w-full py-3 px-5 rounded-xl text-sm font-bold text-white shadow-lg inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
+                {loading ? (
+                  <>
+                    <GlassSpinner size="sm" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Ayesha Khan"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-4 py-2.5 text-sm"
+                  />
                 </div>
-              </>
-            )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-4 py-2.5 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">
+                  Company / Brand (Optional)
+                </label>
+                <div className="relative">
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Your Startup or Organization"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-4 py-2.5 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">
+                  Password (min 6 characters)
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showRegPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    placeholder="Create a secure password"
+                    className="ss-glass-input w-full rounded-xl pl-10 pr-11 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword((prev) => !prev)}
+                    aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-cyan-300 transition"
+                  >
+                    {showRegPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setRememberMe(next);
+                    syncFirebasePersistenceMode(next);
+                  }}
+                  className="rounded border-slate-500 text-cyan-500"
+                />
+                <span>Remember Me on this device</span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="keep-white-text ss-cta-btn w-full py-3 px-5 rounded-xl text-sm font-bold text-white shadow-lg inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
+                {loading ? (
+                  <>
+                    <GlassSpinner size="sm" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };

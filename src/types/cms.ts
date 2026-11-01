@@ -1,68 +1,93 @@
-export type HairStyle = 'modern-quiff' | 'slick-side' | 'curly-crop' | 'wavy-flow' | 'buzz-fade';
-export type BeardStyle = 'full-groomed' | 'royal-boxed' | 'heavy-stubble' | 'goatee-trim' | 'clean-shaven';
-export type OutfitStyle = 'white-polo' | 'executive-blazer' | 'cyber-hoodie' | 'henley-casual' | 'waistcoat-modern';
-export type GlassesStyle = 'none' | 'clear-tech' | 'aviator' | 'round-studio' | 'cyber-shades';
-export type AvatarExpression = 'confident-smile' | 'friendly-grin' | 'focused-architect' | 'visionary';
+export type ThemeMode = 'glass' | 'light' | 'dark' | 'cyber';
 
-export interface AvatarConfig {
-  skinTone: string;
-  hairStyle: HairStyle;
-  hairColor: string;
-  beardStyle: BeardStyle;
-  beardColor: string;
-  eyeColor: string;
-  eyebrowArch: number;
-  expression: AvatarExpression;
-  outfitStyle: OutfitStyle;
-  shirtPrimaryColor: string;
-  shirtTrimColor1: string;
-  shirtTrimColor2: string;
-  pantsColor: string;
-  glasses: GlassesStyle;
-  watch: boolean;
-  headset: boolean;
-  holoAura: boolean;
+export type ViewLayoutMode = 'desktop' | 'mobile';
+
+export type VoiceGender = 'male' | 'female';
+
+export type SocialPlatformType =
+  | 'whatsapp'
+  | 'telegram'
+  | 'facebook'
+  | 'instagram'
+  | 'linkedin'
+  | 'youtube'
+  | 'x'
+  | 'custom';
+
+export type CustomSocialIconName =
+  | 'MessageCircle'
+  | 'Send'
+  | 'Globe'
+  | 'Mail'
+  | 'Phone'
+  | 'Github'
+  | 'Briefcase'
+  | 'ExternalLink'
+  | 'Sparkles'
+  | 'Video';
+
+export interface SocialLinkItem {
+  id: string;
+  platform: SocialPlatformType;
+  label: string;
+  handleOrTagline: string;
+  url: string;
+  enabled: boolean;
+  isOfficial: boolean;
+  customIconName?: CustomSocialIconName;
+  customIconUrl?: string;
+  accentColor?: string;
 }
 
-export interface HeroStat {
+export interface RealTimeMetricItem {
   id: string;
   value: string;
   label: string;
+  liveAutoIncrement?: 'none' | 'projects_plus_orders' | 'orders_count';
+  baseNumber?: number;
+  suffix?: string;
+}
+
+export interface SiteBrandingMeta {
+  companyName: string;
+  monogram: string;
+  founderName: string;
+  founderTitle: string;
+  contactEmail: string;
+  locationText: string;
+  footerTagline: string;
+  copyrightText: string;
+  /** Header/footer profile mark. Supports a normal URL or an optimized data URL uploaded in Owner Panel. */
+  profileIconUrl: string;
+  /** Browser-tab icon, managed independently from the profile mark. */
+  faviconUrl: string;
 }
 
 export interface HeroCMS {
-  companyName: string;
-  companyAbbreviation: string;
-  founderName: string;
-  founderRole: string;
-  statusBadge: string;
-  heroHeadlinePrefix: string;
-  heroHeadlineHighlight: string;
-  heroHeadlineSuffix: string;
-  heroSubheading: string;
-  ceoBioTitle: string;
-  ceoBioText: string;
-  voiceGreetingScript: string;
+  badgeText: string;
+  headlinePrefix: string;
+  headlineGradient: string;
+  headlineSuffix: string;
+  subheadline: string;
+  introSpeechText: string;
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
-  contactEmail: string;
-  locationLabel: string;
-  socialHandle: string;
-  stats: HeroStat[];
+}
+
+export interface VoiceEngineConfig {
+  voiceGender: VoiceGender;
+  voicePitch: number;
+  speechFrequency: number;
+  highlightDelayMs: number;
+  pakistaniAccentPhonetics: boolean;
+  preferredVoiceURI: string;
 }
 
 export interface ThemeCMS {
-  canvasBg: string;
-  primaryAccent: string;
-  secondaryAccent: string;
-  tertiaryAccent: string;
-  glassOpacity: number;
-  floatingShapeCount: number;
-  particleCount: number;
-  meshDistortion: number;
-  scrollMorphIntensity: number;
-  ambientGlowIntensity: number;
-  floatingShapesVariant: 'mixed-polyhedra' | 'torus-rings' | 'icosahedrons';
+  defaultMode: ThemeMode;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
 }
 
 export interface ServiceItem {
@@ -72,6 +97,7 @@ export interface ServiceItem {
   shortDescription: string;
   deliverables: string[];
   priceLabel: string;
+  basePriceUsd: number;
   turnaround: string;
   iconName: string;
   accentHex: string;
@@ -94,11 +120,53 @@ export interface ProjectItem {
   featured: boolean;
 }
 
-export type InquiryStatus = 'new' | 'reviewing' | 'quoted' | 'in-progress' | 'completed';
+export interface SubAdminPermissions {
+  canEditHero: boolean;
+  canManageServices: boolean;
+  canManageProjects: boolean;
+  canManageTheme: boolean;
+  canManageOrders: boolean;
+  canManageSocial: boolean;
+}
+
+export interface SubAdminAccount {
+  id: string;
+  displayName: string;
+  username: string;
+  email: string;
+  password: string;
+  permissions: SubAdminPermissions;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface SiteCMSData {
+  branding: SiteBrandingMeta;
+  hero: HeroCMS;
+  metrics: RealTimeMetricItem[];
+  socialLinks: SocialLinkItem[];
+  voice: VoiceEngineConfig;
+  theme: ThemeCMS;
+  services: ServiceItem[];
+  projects: ProjectItem[];
+  subAdmins: SubAdminAccount[];
+}
+
+export interface CartItem {
+  serviceId: string;
+  title: string;
+  category: string;
+  priceLabel: string;
+  basePriceUsd: number;
+  quantity: number;
+  turnaround?: string;
+}
+
+export type InquiryStatus = 'new' | 'in_review' | 'quoted' | 'in_progress' | 'completed';
 
 export interface InquiryItem {
   id: string;
-  clientId?: string | null;
+  clientId: string | null;
   clientName: string;
   clientEmail: string;
   companyName: string;
@@ -106,6 +174,7 @@ export interface InquiryItem {
   budgetRange: string;
   timeline: string;
   projectDetails: string;
+  cartSummary?: CartItem[];
   status: InquiryStatus;
   quotedAmount: string;
   adminResponse: string;
@@ -120,15 +189,10 @@ export interface UserProfile {
   displayName: string;
   company: string;
   avatarUrl?: string;
-  authProvider: 'credentials' | 'google';
-  role: 'owner' | 'client';
+  authProvider: 'google' | 'credentials';
+  role: 'owner' | 'subadmin' | 'client';
+  permissions?: SubAdminPermissions;
   createdAt: string;
 }
 
-export interface SiteCMSData {
-  hero: HeroCMS;
-  theme: ThemeCMS;
-  avatar: AvatarConfig;
-  services: ServiceItem[];
-  projects: ProjectItem[];
-}
+export type AppPageView = 'home' | 'owner-dashboard';
