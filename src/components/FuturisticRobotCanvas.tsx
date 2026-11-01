@@ -155,6 +155,16 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       128
     );
 
+    // Studio-rendered anatomical hand plate. The procedural hand remains underneath as a
+    // graceful fallback while this lightweight local asset decodes.
+    const humanHandImage = new Image();
+    humanHandImage.decoding = 'async';
+    humanHandImage.src = './images/photoreal-human-hand.png';
+    let humanHandReady = false;
+    humanHandImage.onload = () => {
+      humanHandReady = true;
+    };
+
     const shockwaves: ShockwaveRing[] = [];
     const motes: EnergyMote[] = [];
 
@@ -637,6 +647,31 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       );
       ctx.fill();
       ctx.restore();
+
+      // Composite the high-resolution photographed skin plate over the procedural volume.
+      // Its transparent pixels retain all energy, glow and background animation underneath.
+      if (humanHandReady && humanHandImage.naturalWidth > 0) {
+        const plateHeight = 188 * scaleUnit;
+        const plateWidth = plateHeight * (humanHandImage.naturalWidth / humanHandImage.naturalHeight);
+        const plateX = hTipX - plateWidth * 0.992;
+        const plateY = hTipY - plateHeight * 0.075;
+        ctx.save();
+        ctx.globalAlpha = isLight ? 0.96 : 0.93;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(humanHandImage, plateX, plateY, plateWidth, plateHeight);
+        // Cool reflected contact light integrates the real skin with the digital nexus.
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.12 + proximity * 0.2;
+        ctx.drawImage(
+          cyanGlowSprite,
+          hTipX - 34 * scaleUnit,
+          hTipY - 34 * scaleUnit,
+          68 * scaleUnit,
+          68 * scaleUnit
+        );
+        ctx.restore();
+      }
 
       // =========================================================================
       // 4. PHOTOREALISTIC TITANIUM-CHROME ROBOTIC HAND & INDEX FINGER (RIGHT)
