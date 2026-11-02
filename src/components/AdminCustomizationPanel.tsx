@@ -11,6 +11,7 @@ import {
   FolderKanban,
   Gauge,
   Globe,
+  Image as ImageIcon,
   Inbox,
   KeyRound,
   Layout,
@@ -23,6 +24,7 @@ import {
   Share2,
   ShieldCheck,
   Trash2,
+  Upload,
   UserPlus,
   Users,
   Volume2,
@@ -105,6 +107,40 @@ const CUSTOM_SOCIAL_ICONS: CustomSocialIconName[] = [
   'Sparkles',
   'Video',
 ];
+
+/** Resize uploads before storing them in Firestore/localStorage. This keeps the CMS document small. */
+async function optimizeBrandImage(
+  file: File,
+  size: number,
+  outputType: 'image/png' | 'image/jpeg'
+): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('Image must be smaller than 10 MB.');
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('This image could not be read.'));
+      img.src = objectUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Image processing is unavailable in this browser.');
+
+    ctx.clearRect(0, 0, size, size);
+    const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+    const sx = (image.naturalWidth - sourceSize) / 2;
+    const sy = (image.naturalHeight - sourceSize) / 2;
+    ctx.drawImage(image, sx, sy, sourceSize, sourceSize, 0, 0, size, size);
+    return canvas.toDataURL(outputType, outputType === 'image/jpeg' ? 0.86 : undefined);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
 
 export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = ({
   currentUser,
@@ -693,6 +729,45 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     try {
       await api.deleteInquiry(inq.id);
       pushToast('Order Archived', `Removed inquiry #${inq.id.slice(0, 8)}.`, 'info');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleBrandImageUpload = async (
+    kind: 'profile' | 'favicon',
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setBusyKey(`upload-${kind}`);
+    try {
+      const dataUrl = await optimizeBrandImage(
+        file,
+        kind === 'profile' ? 512 : 128,
+        kind === 'profile' ? 'image/jpeg' : 'image/png'
+      );
+      const next =
+        kind === 'profile'
+          ? { ...brandingDraft, profileIconUrl: dataUrl }
+          : { ...brandingDraft, faviconUrl: dataUrl };
+      setBrandingDraft(next);
+      // Persist immediately so choosing a file cannot be lost by navigating away.
+      await api.updateBranding(next);
+      await onRefreshCMS();
+      pushToast(
+        kind === 'profile' ? 'Profile Picture Updated' : 'Favicon Updated',
+        'The optimized image is saved and is now live across the website.',
+        'success'
+      );
+    } catch (error) {
+      pushToast(
+        'Image Update Failed',
+        error instanceof Error ? error.message : 'Please try another image.',
+        'error'
+      );
     } finally {
       setBusyKey(null);
     }
@@ -2326,19 +2401,94 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                       className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-xs"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-200 mb-1">
-                      Custom Logo Icon URL (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={brandingDraft.profileIconUrl}
-                      onChange={(e) =>
-                        setBrandingDraft({ ...brandingDraft, profileIconUrl: e.target.value })
-                      }
-                      placeholder="Leave empty for SS crystal monogram"
-                      className="ss-glass-input w-full rounded-xl px-3.5 py-2 text-xs"
-                    />
+                  <div className="sm:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 shrink-0 rounded-2xl overflow-hidden border border-cyan-300/30 bg-slate-950/70 grid place-items-center">
+                          {brandingDraft.profileIconUrl ? (
+                            <img
+                              src={brandingDraft.profileIconUrl}
+                              alt="Profile preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="w-6 h-6 text-cyan-300" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-white">Website Profile Picture</p>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            JPG, PNG or WebP. Automatically cropped and optimized.
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <label className="ss-glass-btn cursor-pointer inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-semibold text-cyan-200">
+                              {busyKey === 'upload-profile' ? <GlassSpinner size="sm" /> : <Upload className="w-3.5 h-3.5" />}
+                              <span>Upload Picture</span>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                className="sr-only"
+                                disabled={busyKey !== null}
+                                onChange={(e) => void handleBrandImageUpload('profile', e)}
+                              />
+                            </label>
+                            {brandingDraft.profileIconUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setBrandingDraft({ ...brandingDraft, profileIconUrl: '' })}
+                                className="ss-glass-btn rounded-xl px-3 py-2 text-[11px] font-semibold text-rose-300"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 shrink-0 rounded-2xl overflow-hidden border border-indigo-300/30 bg-slate-950/70 grid place-items-center">
+                          {brandingDraft.faviconUrl ? (
+                            <img
+                              src={brandingDraft.faviconUrl}
+                              alt="Favicon preview"
+                              className="w-11 h-11 object-contain"
+                            />
+                          ) : (
+                            <span className="font-black text-lg text-cyan-300">{brandingDraft.monogram || 'SS'}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-white">Browser Favicon</p>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Updated independently in the browser tab. Square PNG works best.
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <label className="ss-glass-btn cursor-pointer inline-flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-semibold text-indigo-200">
+                              {busyKey === 'upload-favicon' ? <GlassSpinner size="sm" /> : <Upload className="w-3.5 h-3.5" />}
+                              <span>Upload Favicon</span>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/x-icon"
+                                className="sr-only"
+                                disabled={busyKey !== null}
+                                onChange={(e) => void handleBrandImageUpload('favicon', e)}
+                              />
+                            </label>
+                            {brandingDraft.faviconUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setBrandingDraft({ ...brandingDraft, faviconUrl: '' })}
+                                className="ss-glass-btn rounded-xl px-3 py-2 text-[11px] font-semibold text-rose-300"
+                              >
+                                Use SS Default
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

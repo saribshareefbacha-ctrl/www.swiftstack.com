@@ -1,5 +1,7 @@
 import { SiteBrandingMeta, ThemeCMS } from '../types/cms';
 
+let faviconRefreshTimer: number | null = null;
+
 export function buildGlowingFaviconDataUrl(
   monogram: string,
   primaryHex: string,
@@ -20,6 +22,49 @@ export function buildGlowingFaviconDataUrl(
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+function faviconMimeType(href: string): string {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+)/.exec(href);
+  if (match) return match[1];
+  const clean = href.split(/[?#]/)[0].toLowerCase();
+  if (clean.endsWith('.svg')) return 'image/svg+xml';
+  if (clean.endsWith('.ico')) return 'image/x-icon';
+  if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) return 'image/jpeg';
+  if (clean.endsWith('.webp')) return 'image/webp';
+  return 'image/png';
+}
+
+/**
+ * Replace—not merely mutate—favicon nodes. Chromium, Safari and mobile browsers can retain the
+ * first favicon element indefinitely; fresh nodes and all common rel variants reliably invalidate
+ * that cache without requiring a page reload.
+ */
+export function applyDocumentFavicon(href: string): void {
+  if (typeof document === 'undefined' || !href) return;
+
+  document
+    .querySelectorAll<HTMLLinkElement>(
+      'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'
+    )
+    .forEach((node) => node.remove());
+
+  const type = faviconMimeType(href);
+  const definitions: Array<{ rel: string; sizes?: string }> = [
+    { rel: 'icon', sizes: '32x32' },
+    { rel: 'shortcut icon' },
+    { rel: 'apple-touch-icon', sizes: '180x180' },
+  ];
+
+  definitions.forEach(({ rel, sizes }) => {
+    const link = document.createElement('link');
+    link.rel = rel;
+    link.type = type;
+    if (sizes) link.sizes = sizes;
+    link.href = href;
+    link.dataset.swiftstackFavicon = 'true';
+    document.head.appendChild(link);
+  });
+}
+
 export function syncDocumentBranding(branding: SiteBrandingMeta, theme: ThemeCMS): void {
   if (typeof document === 'undefined') return;
 
@@ -32,26 +77,23 @@ export function syncDocumentBranding(branding: SiteBrandingMeta, theme: ThemeCMS
     metaDesc.setAttribute('name', 'description');
     document.head.appendChild(metaDesc);
   }
-  if (branding.footerTagline) {
-    metaDesc.setAttribute('content', branding.footerTagline);
-  }
+  if (branding.footerTagline) metaDesc.setAttribute('content', branding.footerTagline);
 
-  let linkIcon = document.querySelector<HTMLLinkElement>('link[rel*="icon"]');
-  if (!linkIcon) {
-    linkIcon = document.createElement('link');
-    linkIcon.rel = 'icon';
-    document.head.appendChild(linkIcon);
-  }
-
-  if (branding.profileIconUrl && branding.profileIconUrl.trim().length > 0) {
-    linkIcon.type = 'image/png';
-    linkIcon.href = branding.profileIconUrl.trim();
-  } else {
-    linkIcon.type = 'image/svg+xml';
-    linkIcon.href = buildGlowingFaviconDataUrl(
+  const nextHref =
+    branding.faviconUrl?.trim() ||
+    buildGlowingFaviconDataUrl(
       branding.monogram || 'SS',
       theme.primaryColor,
       theme.secondaryColor
     );
-  }
+
+  applyDocumentFavicon(nextHref);
+
+  // Safari occasionally restores the favicon parsed from HTML after hydration. Re-apply once after
+  // the current render settles. The previous timer is cancelled when branding changes rapidly.
+  if (faviconRefreshTimer !== null) window.clearTimeout(faviconRefreshTimer);
+  faviconRefreshTimer = window.setTimeout(() => {
+    applyDocumentFavicon(nextHref);
+    faviconRefreshTimer = null;
+  }, 250);
 }

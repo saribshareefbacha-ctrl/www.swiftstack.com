@@ -112,6 +112,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       'Ultra-modern full-stack engineering, AI automation agents, interactive digital platforms, and creative brand architecture.',
     copyrightText: '© 2026 SwiftStack (SS). Founded & Owned by Muhammad Sarib Randhawa.',
     profileIconUrl: '',
+    faviconUrl: '',
   },
   hero: {
     badgeText: 'SWIFTSTACK (SS) · FOUNDED BY MUHAMMAD SARIB RANDHAWA',

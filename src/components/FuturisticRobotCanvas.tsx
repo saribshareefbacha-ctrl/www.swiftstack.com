@@ -155,6 +155,16 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       128
     );
 
+    // Studio-rendered anatomical hand plate. The procedural hand remains underneath as a
+    // graceful fallback while this lightweight local asset decodes.
+    const humanHandImage = new Image();
+    humanHandImage.decoding = 'async';
+    humanHandImage.src = './images/human-hand-clear-v2.png';
+    let humanHandReady = false;
+    humanHandImage.onload = () => {
+      humanHandReady = true;
+    };
+
     const shockwaves: ShockwaveRing[] = [];
     const motes: EnergyMote[] = [];
 
@@ -230,24 +240,26 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
     // Realistic Subsurface Human Skin Cylinder Gradient Stops
     const humanSkinStops: [number, string][] = isLight
       ? [
-          [0.0, 'rgba(255, 224, 198, 0.62)'],
-          [0.24, 'rgba(241, 184, 148, 0.68)'],
-          [0.62, 'rgba(196, 129, 95, 0.66)'],
-          [0.88, 'rgba(128, 74, 52, 0.60)'],
-          [1.0, 'rgba(56, 189, 248, 0.35)'],
+          [0.0, 'rgba(255, 239, 224, 0.98)'],
+          [0.16, 'rgba(244, 199, 169, 0.99)'],
+          [0.48, 'rgba(211, 146, 111, 0.99)'],
+          [0.78, 'rgba(151, 88, 62, 0.98)'],
+          [1.0, 'rgba(83, 43, 32, 0.96)'],
         ]
       : [
-          [0.0, 'rgba(125, 211, 252, 0.42)'], // Cool cyan rim light from nexus!
-          [0.14, 'rgba(255, 226, 202, 0.62)'], // Warm key-light dermal ridge
-          [0.48, 'rgba(222, 158, 122, 0.58)'], // Natural warm flesh tone
-          [0.82, 'rgba(134, 77, 54, 0.56)'], // Deep subsurface shadow
-          [1.0, 'rgba(52, 26, 19, 0.62)'], // Core ambient occlusion
+          [0.0, 'rgba(186, 224, 230, 0.94)'], // cool studio rim reflected from nexus
+          [0.10, 'rgba(255, 229, 210, 0.99)'], // moist specular ridge
+          [0.32, 'rgba(232, 177, 143, 1)'], // epidermal midtone
+          [0.66, 'rgba(181, 111, 79, 0.99)'], // warm subsurface blood tone
+          [0.88, 'rgba(112, 61, 45, 0.99)'], // anatomical form shadow
+          [1.0, 'rgba(55, 29, 24, 0.98)'], // contact occlusion
         ];
 
     const humanBackFingerStops: [number, string][] = [
-      [0.0, 'rgba(214, 152, 118, 0.36)'],
-      [0.55, 'rgba(132, 76, 54, 0.40)'],
-      [1.0, 'rgba(46, 24, 18, 0.46)'],
+      [0.0, 'rgba(239, 188, 155, 0.92)'],
+      [0.42, 'rgba(188, 119, 85, 0.94)'],
+      [0.82, 'rgba(112, 61, 45, 0.94)'],
+      [1.0, 'rgba(49, 27, 23, 0.92)'],
     ];
 
     // Brushed Titanium-Chrome Cylindrical Metallic Gradient Stops
@@ -376,6 +388,9 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       const hForearmX = hWristX - 185 * scaleUnit;
       const hForearmY = hWristY + 62 * scaleUnit;
 
+      // Render the procedural anatomical fallback only until the photographic skin plate loads.
+      // Keeping it behind the transparent plate produced a visible second-hand silhouette/halo.
+      if (!humanHandReady) {
       // Subtle warm dermal glow around human hand
       ctx.globalAlpha = 0.34;
       ctx.drawImage(
@@ -430,16 +445,96 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
         30 * scaleUnit,
         humanSkinStops
       );
-      drawShadedCapsule(
-        ctx,
-        hWristX,
-        hWristY,
-        31 * scaleUnit,
-        hMcpX - 6 * scaleUnit,
-        hMcpY + 18 * scaleUnit,
-        28 * scaleUnit,
-        humanSkinStops
+      // Anatomically sculpted palm silhouette. A single tapered capsule looked synthetic;
+      // this asymmetric Bézier shape includes the thenar pad, knuckle ridge and wrist taper.
+      ctx.save();
+      const palmGradient = ctx.createLinearGradient(
+        hMcpX,
+        hMcpY - 28 * scaleUnit,
+        hMcpX,
+        hMcpY + 58 * scaleUnit
       );
+      palmGradient.addColorStop(0, isLight ? '#f7c7a7' : '#efc0a0');
+      palmGradient.addColorStop(0.28, isLight ? '#dfa17c' : '#d99a73');
+      palmGradient.addColorStop(0.62, isLight ? '#b87150' : '#ad684b');
+      palmGradient.addColorStop(1, isLight ? '#75432f' : '#583126');
+      ctx.beginPath();
+      ctx.moveTo(hWristX - 6 * scaleUnit, hWristY - 27 * scaleUnit);
+      ctx.bezierCurveTo(
+        hWristX + 36 * scaleUnit,
+        hWristY - 40 * scaleUnit,
+        hMcpX - 47 * scaleUnit,
+        hMcpY - 29 * scaleUnit,
+        hMcpX - 4 * scaleUnit,
+        hMcpY - 18 * scaleUnit
+      );
+      ctx.bezierCurveTo(
+        hMcpX + 22 * scaleUnit,
+        hMcpY - 11 * scaleUnit,
+        hMcpX + 30 * scaleUnit,
+        hMcpY + 10 * scaleUnit,
+        hMcpX + 21 * scaleUnit,
+        hMcpY + 34 * scaleUnit
+      );
+      ctx.bezierCurveTo(
+        hMcpX + 8 * scaleUnit,
+        hMcpY + 61 * scaleUnit,
+        hWristX + 34 * scaleUnit,
+        hWristY + 38 * scaleUnit,
+        hWristX - 8 * scaleUnit,
+        hWristY + 29 * scaleUnit
+      );
+      ctx.closePath();
+      ctx.fillStyle = palmGradient;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(63, 31, 23, 0.48)';
+      ctx.lineWidth = Math.max(0.7, 1.1 * scaleUnit);
+      ctx.stroke();
+
+      // Soft dorsal highlight and extensor tendons give the hand bone/skin structure.
+      const dorsalGlow = ctx.createRadialGradient(
+        hMcpX - 36 * scaleUnit,
+        hMcpY + 1 * scaleUnit,
+        2,
+        hMcpX - 36 * scaleUnit,
+        hMcpY + 1 * scaleUnit,
+        66 * scaleUnit
+      );
+      dorsalGlow.addColorStop(0, 'rgba(255, 231, 211, 0.36)');
+      dorsalGlow.addColorStop(1, 'rgba(255, 213, 187, 0)');
+      ctx.fillStyle = dorsalGlow;
+      ctx.fill();
+      ctx.lineCap = 'round';
+      for (let tendon = 0; tendon < 3; tendon++) {
+        ctx.beginPath();
+        ctx.moveTo(hWristX + (9 + tendon * 8) * scaleUnit, hWristY - 9 * scaleUnit);
+        ctx.bezierCurveTo(
+          hWristX + 50 * scaleUnit,
+          hWristY - (14 - tendon * 7) * scaleUnit,
+          hMcpX - (30 - tendon * 14) * scaleUnit,
+          hMcpY + tendon * 10 * scaleUnit,
+          hMcpX - (17 - tendon * 13) * scaleUnit,
+          hMcpY + (4 + tendon * 12) * scaleUnit
+        );
+        ctx.strokeStyle = tendon === 0 ? 'rgba(255, 220, 196, 0.22)' : 'rgba(92, 48, 36, 0.18)';
+        ctx.lineWidth = (1.15 - tendon * 0.16) * scaleUnit;
+        ctx.stroke();
+      }
+      // Fine palm/knuckle creases, kept subtle to avoid an illustrated outline.
+      ctx.strokeStyle = 'rgba(76, 38, 29, 0.28)';
+      ctx.lineWidth = 0.8 * scaleUnit;
+      [0, 1, 2].forEach((crease) => {
+        ctx.beginPath();
+        ctx.arc(
+          hMcpX - (8 + crease * 14) * scaleUnit,
+          hMcpY + (10 + crease * 12) * scaleUnit,
+          (8 + crease * 2) * scaleUnit,
+          0.18,
+          1.2
+        );
+        ctx.stroke();
+      });
+      ctx.restore();
 
       // Natural Thumb Curve beneath Palm
       const hThumbMidX = hMcpX - 24 * scaleUnit;
@@ -499,21 +594,88 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
         humanSkinStops
       );
 
-      // Realistic glossy fingernail highlight on upper tip of human index finger
+      // Joint folds and skin texture anchor each phalanx anatomically.
       ctx.save();
-      ctx.fillStyle = 'rgba(255, 244, 236, 0.45)';
+      ctx.lineCap = 'round';
+      [
+        [hPipX + 1 * scaleUnit, hPipY, 7.2 * scaleUnit],
+        [hDipX + 1 * scaleUnit, hDipY, 5.7 * scaleUnit],
+      ].forEach(([jx, jy, radius]) => {
+        ctx.strokeStyle = 'rgba(74, 35, 27, 0.34)';
+        ctx.lineWidth = Math.max(0.65, 0.85 * scaleUnit);
+        ctx.beginPath();
+        ctx.arc(jx, jy + 1.5 * scaleUnit, radius, 0.25, 1.52);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255, 224, 204, 0.18)';
+        ctx.beginPath();
+        ctx.arc(jx - 1 * scaleUnit, jy - 1 * scaleUnit, radius * 0.82, 3.65, 5.45);
+        ctx.stroke();
+      });
+
+      // Translucent nail plate, pale lunula and a pinpoint wet specular reflection.
+      const nailGradient = ctx.createLinearGradient(
+        hTipX - 12 * scaleUnit,
+        hTipY - 7 * scaleUnit,
+        hTipX,
+        hTipY + 1 * scaleUnit
+      );
+      nailGradient.addColorStop(0, 'rgba(255, 245, 235, 0.88)');
+      nailGradient.addColorStop(0.58, 'rgba(238, 190, 174, 0.74)');
+      nailGradient.addColorStop(1, 'rgba(150, 89, 73, 0.54)');
+      ctx.fillStyle = nailGradient;
       ctx.beginPath();
       ctx.ellipse(
-        hTipX - 6.5 * scaleUnit,
-        hTipY - 3.6 * scaleUnit,
-        5.5 * scaleUnit,
+        hTipX - 7.2 * scaleUnit,
+        hTipY - 3.7 * scaleUnit,
+        6.1 * scaleUnit,
+        3.1 * scaleUnit,
+        0.12,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(92, 48, 39, 0.36)';
+      ctx.lineWidth = 0.65 * scaleUnit;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 251, 246, 0.74)';
+      ctx.beginPath();
+      ctx.ellipse(
+        hTipX - 9.2 * scaleUnit,
+        hTipY - 5.1 * scaleUnit,
         2.2 * scaleUnit,
-        0.14,
+        0.75 * scaleUnit,
+        0.12,
         0,
         Math.PI * 2
       );
       ctx.fill();
       ctx.restore();
+      }
+
+      // Composite the high-resolution photographed skin plate over the procedural volume.
+      // Its transparent pixels retain all energy, glow and background animation underneath.
+      if (humanHandReady && humanHandImage.naturalWidth > 0) {
+        const plateHeight = 188 * scaleUnit;
+        const plateWidth = plateHeight * (humanHandImage.naturalWidth / humanHandImage.naturalHeight);
+        const plateX = hTipX - plateWidth * 0.992;
+        const plateY = hTipY - plateHeight * 0.075;
+        ctx.save();
+        ctx.globalAlpha = isLight ? 0.96 : 0.93;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(humanHandImage, plateX, plateY, plateWidth, plateHeight);
+        // Cool reflected contact light integrates the real skin with the digital nexus.
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.12 + proximity * 0.2;
+        ctx.drawImage(
+          cyanGlowSprite,
+          hTipX - 34 * scaleUnit,
+          hTipY - 34 * scaleUnit,
+          68 * scaleUnit,
+          68 * scaleUnit
+        );
+        ctx.restore();
+      }
 
       // =========================================================================
       // 4. PHOTOREALISTIC TITANIUM-CHROME ROBOTIC HAND & INDEX FINGER (RIGHT)

@@ -441,6 +441,10 @@ function mapFirebaseUserWithRoles(fbUser: FirebaseUser, company = ''): UserProfi
 
 async function persistFullCMSToCloud(next: SiteCMSData): Promise<SiteCMSData> {
   saveCachedCMS(next);
+  // Update every mounted consumer immediately; do not wait for the Firestore round trip.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<SiteCMSData>('swiftstack:cms-updated', { detail: next }));
+  }
   try {
     await setDoc(CMS_DOC_REF, next, { merge: true });
     setSyncState('live');
@@ -472,6 +476,12 @@ export const api = {
       })
       .catch(() => {});
 
+    const handleLocalCMSUpdate = (event: Event) => {
+      const next = (event as CustomEvent<SiteCMSData>).detail;
+      if (next) onUpdate(normalizeCMS(next));
+    };
+    window.addEventListener('swiftstack:cms-updated', handleLocalCMSUpdate);
+
     const unsubscribe = onSnapshot(
       CMS_DOC_REF,
       (snap) => {
@@ -490,7 +500,10 @@ export const api = {
       }
     );
 
-    return unsubscribe;
+    return () => {
+      window.removeEventListener('swiftstack:cms-updated', handleLocalCMSUpdate);
+      unsubscribe();
+    };
   },
 
   subscribeOrders: (onUpdate: (orders: InquiryItem[]) => void): (() => void) => {

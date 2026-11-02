@@ -57,7 +57,10 @@ export interface SiteBrandingMeta {
   locationText: string;
   footerTagline: string;
   copyrightText: string;
+  /** Header/footer profile mark. Supports a normal URL or an optimized data URL uploaded in Owner Panel. */
   profileIconUrl: string;
+  /** Browser-tab icon, managed independently from the profile mark. */
+  faviconUrl: string;
 }
 
 export interface HeroCMS {
