@@ -159,7 +159,7 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
     // graceful fallback while this lightweight local asset decodes.
     const humanHandImage = new Image();
     humanHandImage.decoding = 'async';
-    humanHandImage.src = './images/photoreal-human-hand.png';
+    humanHandImage.src = './images/human-hand-clear-v2.png';
     let humanHandReady = false;
     humanHandImage.onload = () => {
       humanHandReady = true;
