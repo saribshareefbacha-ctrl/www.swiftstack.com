@@ -249,6 +249,7 @@ app.put('/api/cms/sync', (req, res) => {
     theme: { ...current.theme, ...(body.theme || {}) },
     services: Array.isArray(body.services) ? body.services : current.services,
     projects: Array.isArray(body.projects) ? body.projects : current.projects,
+    discountCodes: Array.isArray(body.discountCodes) ? body.discountCodes : current.discountCodes,
     subAdmins: Array.isArray(body.subAdmins) ? body.subAdmins : current.subAdmins,
   });
   res.json(merged);

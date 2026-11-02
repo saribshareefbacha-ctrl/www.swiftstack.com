@@ -9,12 +9,14 @@ import {
   Send,
   ShoppingCart,
   Sparkles,
+  TicketPercent,
   Trash2,
   User as UserIcon,
   X,
 } from 'lucide-react';
-import { CartItem, InquiryItem, ServiceItem, ThemeCMS, UserProfile } from '../types/cms';
+import { AppliedDiscount, CartItem, DiscountCode, InquiryItem, ServiceItem, ThemeCMS, UserProfile } from '../types/cms';
 import { api } from '../utils/api';
+import { validateDiscountCode } from '../utils/discounts';
 import { GlassSpinner, pushToast } from './GlassUI';
 
 interface ClientPortalModalProps {
@@ -24,6 +26,7 @@ interface ClientPortalModalProps {
   services: ServiceItem[];
   inquiries: InquiryItem[];
   cart: CartItem[];
+  discountCodes: DiscountCode[];
   theme: ThemeCMS;
   onClose: () => void;
   onOpenAuth: (tab?: 'login' | 'register') => void;
@@ -64,6 +67,7 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   services,
   inquiries,
   cart,
+  discountCodes,
   theme,
   onClose,
   onOpenAuth,
@@ -82,6 +86,9 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   const [checkoutEmail, setCheckoutEmail] = useState(user?.email || '');
   const [checkoutNotes, setCheckoutNotes] = useState('');
   const [checkoutDone, setCheckoutDone] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponMessage, setCouponMessage] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
 
   const [serviceTitle, setServiceTitle] = useState(services[0]?.title || 'Custom Service');
   const [budgetRange, setBudgetRange] = useState('$1,000 – $2,500 (Growth Build)');
@@ -113,6 +120,17 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
 
   const cartSubtotal = cart.reduce((sum, item) => sum + item.basePriceUsd * item.quantity, 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const effectiveDiscount = appliedDiscount?.subtotalUsd === cartSubtotal ? appliedDiscount : null;
+  const checkoutTotal = effectiveDiscount?.totalUsd ?? cartSubtotal;
+
+  const handleApplyCoupon = () => {
+    const normalized = couponInput.trim().toUpperCase();
+    const previousUses = clientOrders.filter((order) => order.appliedDiscount?.code === normalized).length;
+    const result = validateDiscountCode(couponInput, cartSubtotal, discountCodes, new Date(), previousUses);
+    setCouponMessage(result.message);
+    setAppliedDiscount(result.valid && result.applied ? result.applied : null);
+    pushToast(result.valid ? 'Coupon Applied!' : 'Coupon Not Applied', result.message, result.valid ? 'success' : 'error');
+  };
 
   const handleCartCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,19 +144,21 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
         clientEmail: checkoutEmail || user?.email || '',
         companyName: user?.company || '',
         serviceTitle: summaryTitles,
-        budgetRange: `Shopping Cart Order ($${cartSubtotal.toLocaleString()} USD)`,
+        budgetRange: `Shopping Cart Order ($${checkoutTotal.toLocaleString()} USD${effectiveDiscount ? ` after ${effectiveDiscount.code} discount` : ''})`,
         timeline: 'Priority Kickoff',
         projectDetails:
           checkoutNotes.trim() ||
           `Direct Shopping Cart Order for ${totalItems} item(s): ${summaryTitles}.`,
         cartSummary: cart,
+        appliedDiscount: effectiveDiscount || undefined,
       });
+      if (effectiveDiscount) await api.redeemDiscountCode(effectiveDiscount.code);
       onClearCart();
       setCheckoutNotes('');
       setCheckoutDone(true);
       pushToast(
         'Shopping Cart Order Placed!',
-        `Order total $${cartSubtotal.toLocaleString()} USD sent to SwiftStack.`,
+        `Order total $${checkoutTotal.toLocaleString()} USD sent to SwiftStack.`, 
         'success'
       );
       if (user) {
@@ -438,13 +458,23 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                     onSubmit={handleCartCheckout}
                     className="lg:col-span-5 ss-glass-card rounded-2xl p-5 space-y-4"
                   >
-                    <div className="flex items-center justify-between border-b border-white/15 pb-3">
-                      <span className="text-xs font-mono uppercase text-slate-300">
-                        Estimated Order Total
-                      </span>
-                      <span className="font-display text-xl font-extrabold text-cyan-400">
-                        ${cartSubtotal.toLocaleString()} USD
-                      </span>
+                    <div className="border-b border-white/15 pb-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono uppercase text-slate-300">Subtotal</span>
+                        <span className={effectiveDiscount ? 'text-sm text-slate-400 line-through' : 'font-display text-xl font-extrabold text-cyan-400'}>${cartSubtotal.toLocaleString()} USD</span>
+                      </div>
+                      {effectiveDiscount && <>
+                        <div className="flex justify-between text-xs text-emerald-300"><span>Coupon {effectiveDiscount.code}</span><span>−${effectiveDiscount.discountUsd.toLocaleString()}</span></div>
+                        <div className="flex justify-between font-bold text-white"><span>Order Total</span><span className="text-xl text-cyan-300">${checkoutTotal.toLocaleString()} USD</span></div>
+                      </>}
+                    </div>
+                    <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 p-3">
+                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 mb-2"><TicketPercent className="w-4 h-4 text-cyan-300" /> Discount Code or Coupon</label>
+                      <div className="flex gap-2">
+                        <input value={couponInput} onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponMessage(''); }} placeholder="ENTER CODE" className="ss-glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-xs uppercase" />
+                        <button type="button" onClick={handleApplyCoupon} className="ss-glass-btn rounded-xl px-3 py-2 text-xs font-bold text-cyan-200">Apply</button>
+                      </div>
+                      {couponMessage && <p className={`mt-2 text-[11px] ${appliedDiscount ? 'text-emerald-300' : 'text-rose-300'}`}>{couponMessage}</p>}
                     </div>
 
                     <div>

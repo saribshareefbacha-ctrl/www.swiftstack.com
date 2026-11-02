@@ -130,6 +130,7 @@ export function readStore(): PersistentStoreSchema {
           theme: { ...base.cms.theme, ...(parsed.cms?.theme || {}) },
           services: parsed.cms?.services || base.cms.services,
           projects: parsed.cms?.projects || base.cms.projects,
+          discountCodes: parsed.cms?.discountCodes || base.cms.discountCodes,
           subAdmins: parsed.cms?.subAdmins || base.cms.subAdmins,
         },
         users: Array.isArray(parsed.users) && parsed.users.length > 0 ? parsed.users : base.users,
