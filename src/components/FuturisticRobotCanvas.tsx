@@ -388,6 +388,9 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       const hForearmX = hWristX - 185 * scaleUnit;
       const hForearmY = hWristY + 62 * scaleUnit;
 
+      // Render the procedural anatomical fallback only until the photographic skin plate loads.
+      // Keeping it behind the transparent plate produced a visible second-hand silhouette/halo.
+      if (!humanHandReady) {
       // Subtle warm dermal glow around human hand
       ctx.globalAlpha = 0.34;
       ctx.drawImage(
@@ -647,6 +650,7 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       );
       ctx.fill();
       ctx.restore();
+      }
 
       // Composite the high-resolution photographed skin plate over the procedural volume.
       // Its transparent pixels retain all energy, glow and background animation underneath.
