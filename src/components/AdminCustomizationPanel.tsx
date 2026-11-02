@@ -2297,6 +2297,19 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                   {editingDiscountId ? 'Edit Coupon' : 'Create Discount Code'}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">Configure value, schedule, order minimum and redemption limits.</p>
+                {!editingDiscountId && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      { label: '10% Welcome', code: 'WELCOME10', type: 'percentage' as const, value: 10 },
+                      { label: '20% Launch', code: 'LAUNCH20', type: 'percentage' as const, value: 20 },
+                      { label: '$100 Off', code: 'SAVE100', type: 'fixed' as const, value: 100 },
+                    ].map((preset) => (
+                      <button key={preset.code} type="button" onClick={() => setCouponForm({...couponForm, code: preset.code, description: preset.label, type: preset.type, value: preset.value})} className="ss-glass-btn rounded-xl px-3 py-1.5 text-[10px] font-bold text-cyan-200">
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="text-xs text-slate-300">Coupon Code

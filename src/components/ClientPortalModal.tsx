@@ -123,10 +123,11 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
   const effectiveDiscount = appliedDiscount?.subtotalUsd === cartSubtotal ? appliedDiscount : null;
   const checkoutTotal = effectiveDiscount?.totalUsd ?? cartSubtotal;
 
-  const handleApplyCoupon = () => {
-    const normalized = couponInput.trim().toUpperCase();
+  const handleApplyCoupon = (selectedCode = couponInput) => {
+    const normalized = selectedCode.trim().toUpperCase();
+    setCouponInput(normalized);
     const previousUses = clientOrders.filter((order) => order.appliedDiscount?.code === normalized).length;
-    const result = validateDiscountCode(couponInput, cartSubtotal, discountCodes, new Date(), previousUses);
+    const result = validateDiscountCode(normalized, cartSubtotal, discountCodes, new Date(), previousUses);
     setCouponMessage(result.message);
     setAppliedDiscount(result.valid && result.applied ? result.applied : null);
     pushToast(result.valid ? 'Coupon Applied!' : 'Coupon Not Applied', result.message, result.valid ? 'success' : 'error');
@@ -472,9 +473,24 @@ export const ClientPortalModal: React.FC<ClientPortalModalProps> = ({
                       <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 mb-2"><TicketPercent className="w-4 h-4 text-cyan-300" /> Discount Code or Coupon</label>
                       <div className="flex gap-2">
                         <input value={couponInput} onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponMessage(''); }} placeholder="ENTER CODE" className="ss-glass-input min-w-0 flex-1 rounded-xl px-3 py-2 text-xs uppercase" />
-                        <button type="button" onClick={handleApplyCoupon} className="ss-glass-btn rounded-xl px-3 py-2 text-xs font-bold text-cyan-200">Apply</button>
+                        <button type="button" onClick={() => handleApplyCoupon()} className="ss-glass-btn rounded-xl px-3 py-2 text-xs font-bold text-cyan-200">Apply</button>
                       </div>
-                      {couponMessage && <p className={`mt-2 text-[11px] ${appliedDiscount ? 'text-emerald-300' : 'text-rose-300'}`}>{couponMessage}</p>}
+                      {discountCodes.some((code) => code.active) && (
+                        <div className="mt-3">
+                          <p className="text-[10px] uppercase tracking-wider text-slate-400 mb-1.5">Available coupon options</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {discountCodes
+                              .filter((code) => code.active && (!code.startsAt || new Date(code.startsAt).getTime() <= Date.now()) && (!code.expiresAt || new Date(code.expiresAt).getTime() > Date.now()) && (!code.usageLimit || code.usedCount < code.usageLimit))
+                              .slice(0, 5)
+                              .map((code) => (
+                                <button key={code.id} type="button" onClick={() => handleApplyCoupon(code.code)} className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1.5 text-[10px] font-bold text-cyan-200 hover:bg-cyan-500/20 transition-colors">
+                                  {code.code} · {code.type === 'percentage' ? `${code.value}% OFF` : `$${code.value} OFF`}
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      {couponMessage && <p className={`mt-2 text-[11px] ${effectiveDiscount ? 'text-emerald-300' : 'text-rose-300'}`}>{couponMessage}</p>}
                     </div>
 
                     <div>
