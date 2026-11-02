@@ -23,6 +23,7 @@ import {
   Save,
   Share2,
   ShieldCheck,
+  TicketPercent,
   Trash2,
   Upload,
   UserPlus,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react';
 import {
   CustomSocialIconName,
+  DiscountCode,
   HeroCMS,
   InquiryItem,
   InquiryStatus,
@@ -64,6 +66,7 @@ export type AdminTab =
   | 'metrics'
   | 'services'
   | 'projects'
+  | 'discounts'
   | 'orders'
   | 'branding'
   | 'team';
@@ -230,6 +233,23 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
   const [customSocIconUrl, setCustomSocIconUrl] = useState('');
   const [customSocColor, setCustomSocColor] = useState('#38bdf8');
 
+  // Discount Codes & Coupons State
+  const [discountDraft, setDiscountDraft] = useState<DiscountCode[]>(cmsData.discountCodes || []);
+  const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
+  const [couponForm, setCouponForm] = useState<Omit<DiscountCode, 'id' | 'usedCount' | 'createdAt'>>({
+    code: '',
+    description: '',
+    type: 'percentage',
+    value: 10,
+    minimumOrderUsd: 0,
+    maximumDiscountUsd: undefined,
+    startsAt: '',
+    expiresAt: '',
+    usageLimit: undefined,
+    perCustomerLimit: 1,
+    active: true,
+  });
+
   // Real-Time Metrics State
   const [metricsDraft, setMetricsDraft] = useState<RealTimeMetricItem[]>(cmsData.metrics || []);
 
@@ -291,6 +311,7 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     setVoiceDraft(cmsData.voice);
     setIntroScriptDraft(cmsData.hero.introSpeechText);
     setSocialDraft(cmsData.socialLinks || []);
+    setDiscountDraft(cmsData.discountCodes || []);
     setMetricsDraft(cmsData.metrics || []);
     setBrandingDraft(cmsData.branding);
     setHeroDraft(cmsData.hero);
@@ -706,6 +727,67 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
     } finally {
       setBusyKey(null);
     }
+  };
+
+  const resetCouponForm = () => {
+    setEditingDiscountId(null);
+    setCouponForm({
+      code: '', description: '', type: 'percentage', value: 10, minimumOrderUsd: 0,
+      maximumDiscountUsd: undefined, startsAt: '', expiresAt: '', usageLimit: undefined,
+      perCustomerLimit: 1, active: true,
+    });
+  };
+
+  const handleSaveCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = couponForm.code.trim().toUpperCase().replace(/\s+/g, '');
+    if (!code) return pushToast('Code Required', 'Enter a coupon code.', 'error');
+    if (couponForm.value <= 0 || (couponForm.type === 'percentage' && couponForm.value > 100)) {
+      return pushToast('Invalid Discount', 'Enter a positive value (percentage cannot exceed 100).', 'error');
+    }
+    if (couponForm.expiresAt && couponForm.startsAt && couponForm.expiresAt <= couponForm.startsAt) {
+      return pushToast('Invalid Expiry', 'Expiry must be after the starting date.', 'error');
+    }
+    const duplicate = discountDraft.some((d) => d.code.toUpperCase() === code && d.id !== editingDiscountId);
+    if (duplicate) return pushToast('Duplicate Code', 'This coupon code already exists.', 'error');
+
+    const now = new Date().toISOString();
+    const nextItem: DiscountCode = {
+      ...couponForm,
+      code,
+      id: editingDiscountId || `coupon-${Date.now().toString(36)}`,
+      usedCount: editingDiscountId ? discountDraft.find((d) => d.id === editingDiscountId)?.usedCount || 0 : 0,
+      createdAt: editingDiscountId ? discountDraft.find((d) => d.id === editingDiscountId)?.createdAt || now : now,
+    };
+    const next = editingDiscountId
+      ? discountDraft.map((d) => (d.id === editingDiscountId ? nextItem : d))
+      : [nextItem, ...discountDraft];
+    setBusyKey('save-coupon');
+    try {
+      await api.updateDiscountCodes(next);
+      setDiscountDraft(next);
+      resetCouponForm();
+      pushToast('Coupon Saved', `${code} is ready for customers.`, 'success');
+    } finally { setBusyKey(null); }
+  };
+
+  const editCoupon = (item: DiscountCode) => {
+    setEditingDiscountId(item.id);
+    const { id: _id, usedCount: _used, createdAt: _created, ...form } = item;
+    setCouponForm(form);
+  };
+
+  const deleteCoupon = async (id: string) => {
+    const next = discountDraft.filter((d) => d.id !== id);
+    await api.updateDiscountCodes(next);
+    setDiscountDraft(next);
+    pushToast('Coupon Deleted', 'The code can no longer be applied.', 'info');
+  };
+
+  const toggleCoupon = async (id: string) => {
+    const next = discountDraft.map((d) => d.id === id ? { ...d, active: !d.active } : d);
+    await api.updateDiscountCodes(next);
+    setDiscountDraft(next);
   };
 
   const handleSaveOrderUpdate = async (inq: InquiryItem) => {
@@ -2206,6 +2288,80 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
         {/* ================================================================
             TAB 6: SHOPPING CART ORDERS & CLIENT QUOTES PIPELINE
            ================================================================ */}
+        {activeTab === 'discounts' && isOwner && (
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <form onSubmit={handleSaveCoupon} className="xl:col-span-5 ss-admin-card rounded-3xl p-6 space-y-4">
+              <div>
+                <h3 className="font-display text-lg font-bold text-white flex items-center gap-2">
+                  <TicketPercent className="w-5 h-5 text-cyan-300" />
+                  {editingDiscountId ? 'Edit Coupon' : 'Create Discount Code'}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">Configure value, schedule, order minimum and redemption limits.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-xs text-slate-300">Coupon Code
+                  <input required value={couponForm.code} onChange={(e) => setCouponForm({...couponForm, code: e.target.value.toUpperCase()})} placeholder="SWIFT20" className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2 uppercase" />
+                </label>
+                <label className="text-xs text-slate-300">Discount Type
+                  <select value={couponForm.type} onChange={(e) => setCouponForm({...couponForm, type: e.target.value as 'percentage' | 'fixed'})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2">
+                    <option value="percentage">Percentage (%)</option><option value="fixed">Fixed Amount (USD)</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-300">Value
+                  <input type="number" min="0.01" max={couponForm.type === 'percentage' ? 100 : undefined} step="0.01" required value={couponForm.value} onChange={(e) => setCouponForm({...couponForm, value: Number(e.target.value)})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Minimum Order (USD)
+                  <input type="number" min="0" value={couponForm.minimumOrderUsd} onChange={(e) => setCouponForm({...couponForm, minimumOrderUsd: Number(e.target.value)})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Maximum Discount (optional)
+                  <input type="number" min="0" value={couponForm.maximumDiscountUsd ?? ''} onChange={(e) => setCouponForm({...couponForm, maximumDiscountUsd: e.target.value ? Number(e.target.value) : undefined})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Total Usage Limit
+                  <input type="number" min="1" value={couponForm.usageLimit ?? ''} onChange={(e) => setCouponForm({...couponForm, usageLimit: e.target.value ? Number(e.target.value) : undefined})} placeholder="Unlimited" className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Uses Per Customer
+                  <input type="number" min="1" value={couponForm.perCustomerLimit ?? ''} onChange={(e) => setCouponForm({...couponForm, perCustomerLimit: e.target.value ? Number(e.target.value) : undefined})} placeholder="Unlimited" className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Starts At
+                  <input type="datetime-local" value={couponForm.startsAt || ''} onChange={(e) => setCouponForm({...couponForm, startsAt: e.target.value})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+                <label className="text-xs text-slate-300">Expires At
+                  <input type="datetime-local" value={couponForm.expiresAt || ''} onChange={(e) => setCouponForm({...couponForm, expiresAt: e.target.value})} className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+                </label>
+              </div>
+              <label className="text-xs text-slate-300 block">Description
+                <input value={couponForm.description} onChange={(e) => setCouponForm({...couponForm, description: e.target.value})} placeholder="Launch promotion" className="ss-glass-input mt-1 w-full rounded-xl px-3 py-2" />
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                <input type="checkbox" checked={couponForm.active} onChange={(e) => setCouponForm({...couponForm, active: e.target.checked})} /> Active and available to customers
+              </label>
+              <div className="flex gap-2">
+                <button disabled={busyKey === 'save-coupon'} className="ss-cta-btn keep-white-text rounded-xl px-5 py-2.5 text-sm font-bold text-white inline-flex gap-2 items-center">
+                  {busyKey === 'save-coupon' ? <GlassSpinner size="sm" /> : <Save className="w-4 h-4" />} Save Coupon
+                </button>
+                {editingDiscountId && <button type="button" onClick={resetCouponForm} className="ss-glass-btn rounded-xl px-4 py-2 text-xs text-white">Cancel</button>}
+              </div>
+            </form>
+            <div className="xl:col-span-7 space-y-3">
+              {discountDraft.length === 0 ? <div className="ss-admin-card rounded-3xl p-10 text-center text-slate-400">No coupons created yet.</div> : discountDraft.map((item) => {
+                const expired = Boolean(item.expiresAt && new Date(item.expiresAt).getTime() < Date.now());
+                return <div key={item.id} className="ss-admin-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2"><code className="text-base font-black text-cyan-300">{item.code}</code><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.active && !expired ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>{expired ? 'EXPIRED' : item.active ? 'ACTIVE' : 'DISABLED'}</span></div>
+                    <p className="text-sm text-white mt-1">{item.type === 'percentage' ? `${item.value}% off` : `$${item.value.toLocaleString()} off`} · Min ${item.minimumOrderUsd.toLocaleString()}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Used {item.usedCount}{item.usageLimit ? ` / ${item.usageLimit}` : ' times'}{item.expiresAt ? ` · Expires ${new Date(item.expiresAt).toLocaleString()}` : ' · No expiry'}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => void toggleCoupon(item.id)} className="ss-glass-btn rounded-xl px-3 py-2 text-xs text-white">{item.active ? 'Disable' : 'Enable'}</button>
+                    <button type="button" onClick={() => editCoupon(item)} className="ss-glass-btn rounded-xl p-2 text-cyan-300" aria-label="Edit"><Edit3 className="w-4 h-4" /></button>
+                    <button type="button" onClick={() => void deleteCoupon(item.id)} className="ss-glass-btn rounded-xl p-2 text-rose-300" aria-label="Delete"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'orders' && (
           <div className="space-y-4">
             {inquiries.map((inq) => {
@@ -2235,6 +2391,12 @@ export const AdminCustomizationPanel: React.FC<AdminCustomizationPanelProps> = (
                     </button>
                   </div>
 
+                  {inq.appliedDiscount && (
+                    <div className="rounded-xl border border-emerald-400/25 bg-emerald-500/10 p-3 flex flex-wrap justify-between gap-2 text-xs">
+                      <span className="font-bold text-emerald-300">Coupon {inq.appliedDiscount.code}</span>
+                      <span className="text-slate-200">${inq.appliedDiscount.subtotalUsd.toLocaleString()} − ${inq.appliedDiscount.discountUsd.toLocaleString()} = <strong className="text-white">${inq.appliedDiscount.totalUsd.toLocaleString()} USD</strong></span>
+                    </div>
+                  )}
                   <p className="text-xs sm:text-sm text-slate-200">{inq.projectDetails}</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

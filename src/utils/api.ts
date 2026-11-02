@@ -31,7 +31,9 @@ import {
   INITIAL_SAMPLE_INQUIRIES,
 } from '../data/defaultSeed';
 import {
+  AppliedDiscount,
   CartItem,
+  DiscountCode,
   HeroCMS,
   InquiryItem,
   ProjectItem,
@@ -300,6 +302,7 @@ export function normalizeCMS(raw?: Partial<SiteCMSData> | null): SiteCMSData {
         : base.services,
     projects:
       Array.isArray(raw.projects) && raw.projects.length > 0 ? raw.projects : base.projects,
+    discountCodes: Array.isArray(raw.discountCodes) ? raw.discountCodes : base.discountCodes,
     subAdmins: Array.isArray(raw.subAdmins)
       ? raw.subAdmins.map((sa) => ({
           ...sa,
@@ -606,6 +609,24 @@ export const api = {
     const next = { ...getCachedCMS(), socialLinks };
     await persistFullCMSToCloud(next);
     return { socialLinks };
+  },
+
+  updateDiscountCodes: async (
+    discountCodes: DiscountCode[]
+  ): Promise<{ discountCodes: DiscountCode[] }> => {
+    const next = { ...getCachedCMS(), discountCodes };
+    await persistFullCMSToCloud(next);
+    return { discountCodes };
+  },
+
+  redeemDiscountCode: async (code: string): Promise<void> => {
+    const cms = getCachedCMS();
+    cms.discountCodes = cms.discountCodes.map((item) =>
+      item.code.toUpperCase() === code.trim().toUpperCase()
+        ? { ...item, usedCount: item.usedCount + 1 }
+        : item
+    );
+    await persistFullCMSToCloud(cms);
   },
 
   updateVoice: async (voice: VoiceEngineConfig): Promise<{ voice: VoiceEngineConfig }> => {
@@ -974,6 +995,7 @@ export const api = {
     timeline: string;
     projectDetails: string;
     cartSummary?: CartItem[];
+    appliedDiscount?: AppliedDiscount;
   }): Promise<{ inquiry: InquiryItem }> => {
     const now = new Date().toISOString();
     const inquiry: InquiryItem = {

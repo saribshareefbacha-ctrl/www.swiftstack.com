@@ -318,6 +318,7 @@ export const DEFAULT_CMS_DATA: SiteCMSData = {
       featured: true,
     },
   ],
+  discountCodes: [],
   subAdmins: [
     {
       id: 'sub-ops-lead',

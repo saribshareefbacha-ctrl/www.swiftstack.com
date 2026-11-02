@@ -613,6 +613,7 @@ export function App() {
         services={cmsData.services}
         inquiries={inquiries}
         cart={cart}
+        discountCodes={cmsData.discountCodes}
         theme={cmsData.theme}
         onClose={() => {
           setPortalOpen(false);

@@ -140,6 +140,32 @@ export interface SubAdminAccount {
   createdAt: string;
 }
 
+export type DiscountType = 'percentage' | 'fixed';
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  description: string;
+  type: DiscountType;
+  value: number;
+  minimumOrderUsd: number;
+  maximumDiscountUsd?: number;
+  startsAt?: string;
+  expiresAt?: string;
+  usageLimit?: number;
+  usedCount: number;
+  perCustomerLimit?: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface AppliedDiscount {
+  code: string;
+  discountUsd: number;
+  subtotalUsd: number;
+  totalUsd: number;
+}
+
 export interface SiteCMSData {
   branding: SiteBrandingMeta;
   hero: HeroCMS;
@@ -149,6 +175,7 @@ export interface SiteCMSData {
   theme: ThemeCMS;
   services: ServiceItem[];
   projects: ProjectItem[];
+  discountCodes: DiscountCode[];
   subAdmins: SubAdminAccount[];
 }
 
@@ -175,6 +202,7 @@ export interface InquiryItem {
   timeline: string;
   projectDetails: string;
   cartSummary?: CartItem[];
+  appliedDiscount?: AppliedDiscount;
   status: InquiryStatus;
   quotedAmount: string;
   adminResponse: string;
