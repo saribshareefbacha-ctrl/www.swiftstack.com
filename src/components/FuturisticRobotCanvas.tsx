@@ -159,7 +159,7 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
     // graceful fallback while this lightweight local asset decodes.
     const humanHandImage = new Image();
     humanHandImage.decoding = 'async';
-    humanHandImage.src = './images/human-hand-clear-v2.png';
+    humanHandImage.src = './images/human-hand-photo-v3.png';
     let humanHandReady = false;
     humanHandImage.onload = () => {
       humanHandReady = true;
@@ -660,7 +660,7 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
         const plateX = hTipX - plateWidth * 0.992;
         const plateY = hTipY - plateHeight * 0.075;
         ctx.save();
-        ctx.globalAlpha = isLight ? 0.96 : 0.93;
+        ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(humanHandImage, plateX, plateY, plateWidth, plateHeight);
