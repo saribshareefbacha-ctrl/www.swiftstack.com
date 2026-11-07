@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Crown,
+  Languages,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SwiftStackLogo } from './SwiftStackLogo';
 import { ThemeMode, UserProfile, ViewLayoutMode } from '../types/cms';
+import { SITE_LANGUAGES, SiteLanguage, translate } from '../utils/i18n';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -28,6 +30,8 @@ interface NavbarProps {
   themeMode: ThemeMode;
   viewMode: ViewLayoutMode;
   cartCount: number;
+  language: SiteLanguage;
+  onChangeLanguage: (language: SiteLanguage) => void;
   onNavigateSection?: (sectionId: string) => void;
   onChangeThemeMode: (mode: ThemeMode) => void;
   onToggleViewMode: (nextMode: ViewLayoutMode) => void;
@@ -55,6 +59,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   themeMode,
   viewMode,
   cartCount,
+  language,
+  onChangeLanguage,
   onNavigateSection,
   onChangeThemeMode,
   onToggleViewMode,
@@ -117,13 +123,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="text-sm font-semibold text-slate-200 hover:text-cyan-300 transition-colors"
               >
-                {link.label}
+                {translate(language, link.label)}
               </a>
             ))}
           </div>
 
           {/* Right Controls: View Toggle, Sheesha Theme Switcher, Cart & Auth/Admin */}
           <div className="ss-desktop-nav-only hidden lg:flex items-center gap-2">
+            <label className="ss-glass-btn inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs text-cyan-200" title={translate(language, 'Language')}>
+              <Languages className="w-3.5 h-3.5" />
+              <select value={language} onChange={(e) => onChangeLanguage(e.target.value as SiteLanguage)} className="max-w-[82px] bg-transparent text-xs font-bold text-white outline-none cursor-pointer" aria-label="Website language">
+                {SITE_LANGUAGES.map((item) => <option key={item.code} value={item.code} className="bg-slate-950 text-white">{item.nativeName}</option>)}
+              </select>
+            </label>
             {/* Persistent Anytime Desktop View <-> Mobile View Toggle */}
             <button
               type="button"
@@ -134,12 +146,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               {viewMode === 'desktop' ? (
                 <>
                   <Monitor className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>Desktop</span>
+                  <span>{translate(language, 'Desktop')}</span>
                 </>
               ) : (
                 <>
                   <Smartphone className="h-3.5 w-3.5 text-cyan-400" />
-                  <span>Mobile</span>
+                  <span>{translate(language, 'Mobile')}</span>
                 </>
               )}
             </button>
@@ -188,7 +200,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="ss-glass-btn relative inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white"
             >
               <ShoppingCart className="w-4 h-4 text-cyan-400" />
-              <span className="hidden xl:inline">Cart</span>
+              <span className="hidden xl:inline">{translate(language, 'Cart')}</span>
               {cartCount > 0 && (
                 <span
                   className="keep-white-text ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-extrabold text-white"
@@ -270,12 +282,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               {viewMode === 'desktop' ? (
                 <>
                   <Monitor className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Desktop</span>
+                  <span>{translate(language, 'Desktop')}</span>
                 </>
               ) : (
                 <>
                   <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Mobile</span>
+                  <span>{translate(language, 'Mobile')}</span>
                 </>
               )}
             </button>
@@ -308,6 +320,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Expandable Glass Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="mt-4 pt-4 border-t border-white/15 flex flex-col gap-3">
+            <label className="ss-glass-card flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-cyan-200">
+              <Languages className="w-4 h-4" />
+              <span className="font-bold">{translate(language, 'Language')}</span>
+              <select value={language} onChange={(e) => onChangeLanguage(e.target.value as SiteLanguage)} className="ml-auto min-w-0 flex-1 bg-transparent text-right text-sm font-bold text-white outline-none" aria-label="Website language">
+                {SITE_LANGUAGES.map((item) => <option key={item.code} value={item.code} className="bg-slate-950">{item.nativeName} — {item.englishName}</option>)}
+              </select>
+            </label>
             {/* View Mode Toggle Row */}
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -330,7 +349,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }
               >
                 <Monitor className="w-3.5 h-3.5" />
-                <span>Desktop View</span>
+                <span>{translate(language, 'Desktop')} View</span>
               </button>
 
               <button
@@ -353,7 +372,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Mobile View</span>
+                <span>{translate(language, 'Mobile')} View</span>
               </button>
             </div>
 
@@ -400,7 +419,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 className="px-3 py-2 rounded-xl text-sm font-semibold text-slate-200 hover:bg-white/10 transition-colors"
               >
-                {link.label}
+                {translate(language, link.label)}
               </a>
             ))}
 
