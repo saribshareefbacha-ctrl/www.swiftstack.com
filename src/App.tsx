@@ -45,6 +45,7 @@ import { ViewModeSelectorModal } from './components/ViewModeSelectorModal';
 import { GlassFooter } from './components/GlassFooter';
 import { GlassToastViewport, pushToast } from './components/GlassUI';
 import { syncDocumentBranding } from './utils/branding';
+import { applyDocumentLanguage, loadLanguage, SiteLanguage } from './utils/i18n';
 
 export function App() {
   const initialNavRef = useRef(readInitialNavState());
@@ -65,6 +66,7 @@ export function App() {
   );
   const [cart, setCart] = useState<CartItem[]>(() => getSavedCart());
   const [, setSyncState] = useState<CloudSyncState>('connecting');
+  const [language, setLanguage] = useState<SiteLanguage>(() => loadLanguage());
 
   // Active Route & Section State Preserved Across Reloads (URL Hash + LocalStorage)
   const [activePage, setActivePage] = useState<AppPageView>(() => initialNavRef.current.page);
@@ -227,6 +229,11 @@ export function App() {
     syncDocumentBranding(cmsData.branding, cmsData.theme);
   }, [themeMode, cmsData.branding, cmsData.theme]);
 
+  // Persist language and switch document direction for Urdu/Arabic/Pakistani regional scripts.
+  useEffect(() => {
+    applyDocumentLanguage(language);
+  }, [language]);
+
   // Apply Pixel-Perfect Desktop / Mobile Viewport Scaling (and re-sync on device rotation)
   useEffect(() => {
     applyViewModeToDocument(viewMode);
@@ -381,6 +388,8 @@ export function App() {
         themeMode={themeMode}
         viewMode={viewMode}
         cartCount={totalCartItems}
+        language={language}
+        onChangeLanguage={setLanguage}
         onNavigateSection={scrollToSection}
         onChangeThemeMode={handleChangeThemeMode}
         onToggleViewMode={handleSelectViewMode}
