@@ -306,9 +306,12 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
 
       // Smooth 6.4s breath cycle: approach -> luminous fingertip touch -> gentle recoil
       const cycle = (t % 6.4) / 6.4;
-      // Peak touch happens cleanly around cycle = 0.5
-      const proximity = Math.pow(Math.sin(cycle * Math.PI), 1.6); // 0 -> 1 -> 0
-      const separation = (1 - proximity) * (46 * scaleUnit);
+      // Ease into contact and hold it long enough to be clearly visible. The small negative
+      // separation at peak removes raster/antialias gaps between the photographic and robot tips.
+      const approachWave = Math.max(0, Math.sin(cycle * Math.PI));
+      const proximity = Math.min(1, Math.pow(approachWave, 1.25) * 1.15); // sustained 100% contact
+      const contactOverlap = proximity > 0.96 ? ((proximity - 0.96) / 0.04) * 4 * scaleUnit : 0;
+      const separation = (1 - proximity) * (46 * scaleUnit) - contactOverlap;
 
       if (proximity > 0.965 && !hasTriggeredCycleTouch) {
         hasTriggeredCycleTouch = true;
@@ -373,8 +376,9 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       // =========================================================================
       // 3. PHOTOREALISTIC VOLUMETRIC HUMAN HAND & EXTENDED INDEX FINGER (LEFT)
       // =========================================================================
+      const sharedTouchDriftY = Math.sin(t * 1.4) * 1.15;
       const hTipX = nexusX - separation;
-      const hTipY = nexusY + Math.sin(t * 1.4) * 2.2;
+      const hTipY = nexusY + sharedTouchDriftY + (1 - proximity) * 1.2 * scaleUnit;
 
       // Anatomical joint chain backwards from Human Index Fingertip -> DIP -> PIP -> MCP -> Wrist -> Forearm
       const hDipX = hTipX - 24 * scaleUnit;
@@ -681,7 +685,7 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       // 4. PHOTOREALISTIC TITANIUM-CHROME ROBOTIC HAND & INDEX FINGER (RIGHT)
       // =========================================================================
       const rTipX = nexusX + separation;
-      const rTipY = nexusY - Math.sin(t * 1.4) * 2.2;
+      const rTipY = nexusY + sharedTouchDriftY - (1 - proximity) * 1.2 * scaleUnit;
 
       const rDipX = rTipX + 25 * scaleUnit;
       const rDipY = rTipY + 2 * scaleUnit;
