@@ -661,8 +661,13 @@ export const FuturisticRobotCanvas: React.FC<FuturisticRobotCanvasProps> = ({
       if (humanHandReady && humanHandImage.naturalWidth > 0) {
         const plateHeight = 188 * scaleUnit;
         const plateWidth = plateHeight * (humanHandImage.naturalWidth / humanHandImage.naturalHeight);
-        const plateX = hTipX - plateWidth * 0.992;
-        const plateY = hTipY - plateHeight * 0.075;
+        // Calibrated from the actual alpha mask: the photographed fingertip is at
+        // x=1778/1823 and y=277/526, not at the image's transparent top-right corner.
+        // Anchoring that exact skin pixel to hTip removes the visible horizontal/vertical gap.
+        const humanTipXRatio = 1778 / 1823;
+        const humanTipYRatio = 277 / 526;
+        const plateX = hTipX - plateWidth * humanTipXRatio;
+        const plateY = hTipY - plateHeight * humanTipYRatio;
         ctx.save();
         ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = true;
